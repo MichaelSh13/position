@@ -15,12 +15,14 @@ export class AuthJwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get('jwt.access.publicKey'),
-      algorithms: [configService.get('jwt.access.signOptions.algorithm')],
+      secretOrKey: configService.getOrThrow('jwt.access.publicKey'),
+      algorithms: [
+        configService.getOrThrow('jwt.access.signOptions.algorithm'),
+      ],
     } as StrategyOptions);
   }
 
-  async validate(payload: PayloadUser) {
+  async validate(payload: PayloadAccount) {
     return this.authService.validate(payload);
   }
 }

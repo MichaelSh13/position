@@ -24,13 +24,13 @@ module.exports = {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-explicit-any': 'warn',
 
     // Enforce and autofix type-only imports using "import type"
     "@typescript-eslint/consistent-type-exports": "warn",
     "@typescript-eslint/consistent-type-imports": "warn",
 
-    //#region  //*=========== Unused Import ===========
+    //#region =========== Unused Import ===========
     '@typescript-eslint/no-unused-vars': 'off',
     'unused-imports/no-unused-imports': 'warn',
     'unused-imports/no-unused-vars': [
@@ -42,9 +42,9 @@ module.exports = {
         argsIgnorePattern: '^_',
       },
     ],
-    //#endregion  //*======== Unused Import ===========
+    //#endregion ======== Unused Import ===========
 
-    //#region  //*=========== Import Sort ===========
+    //#region =========== Import Sort ===========
     'simple-import-sort/exports': 'warn',
     'simple-import-sort/imports': [
       'warn',
@@ -81,18 +81,18 @@ module.exports = {
         ],
       },
     ],
-    //#endregion  //*======== Import Sort ===========
+    //#endregion ======== Import Sort ===========
 
-    //#region  //*=========== Magic Numbers ===========
+    //#region =========== Magic Numbers ===========
     '@typescript-eslint/no-magic-numbers': [
       'warn',
       {
-        ignore: [0, 1], // Add numbers you want to ignore
+        ignore: [0, 1],
         ignoreArrayIndexes: true,
         enforceConst: true,
         detectObjects: false,
       },
     ],
-    //#endregion  //*======== Magic Numbers ===========
+    //#endregion ======== Magic Numbers ===========
   },
 };

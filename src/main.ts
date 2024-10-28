@@ -14,8 +14,9 @@ async function bootstrap() {
 
   const configService: ConfigService = app.get<ConfigService>(ConfigService);
 
-  const PORT = configService.get<number>('common.port') || DEFAULT_PORT;
-  const API_LIMIT = configService.get<string>('common.api_limit') || '5mb';
+  const PORT = configService.getOrThrow<number>('common.port') || DEFAULT_PORT;
+  const API_LIMIT =
+    configService.getOrThrow<string>('common.apiLimit') || '5mb';
 
   app.enableCors();
   app.enableVersioning({

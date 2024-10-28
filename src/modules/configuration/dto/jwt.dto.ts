@@ -11,7 +11,7 @@ class SignOptions {
   algorithm: string;
 }
 
-class RefreshOptionsDto {
+class SecretOptionsDto {
   // @IsString()
   // @MinLength(1)
   secret: string;
@@ -36,7 +36,11 @@ export class JwtDto {
   @ValidateNested()
   access: AccessOptionsDto;
 
-  @Type(() => RefreshOptionsDto)
+  @Type(() => SecretOptionsDto)
   @ValidateNested()
-  refresh: RefreshOptionsDto;
+  refresh: SecretOptionsDto;
+
+  @Type(() => SecretOptionsDto)
+  @ValidateNested()
+  mail: SecretOptionsDto;
 }

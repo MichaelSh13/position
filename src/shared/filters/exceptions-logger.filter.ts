@@ -5,11 +5,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
-import { CustomLoggerService } from 'src/modules/custom-logger/services/custom-logger.service';
+import { LoggerCustomService } from 'src/modules/logger-custom/services/logger-custom.service';
 
 @Catch()
 export class ExceptionsLoggerFilter extends BaseExceptionFilter {
-  constructor(private readonly logger: CustomLoggerService) {
+  constructor(private readonly logger: LoggerCustomService) {
     super();
   }
 

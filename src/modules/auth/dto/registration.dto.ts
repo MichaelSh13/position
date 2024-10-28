@@ -1,17 +1,10 @@
-import { ApiProperty, PickType } from '@nestjs/swagger';
-import { IsString, MaxLength, MinLength } from 'class-validator';
-import { Match } from 'src/shared/validators/match.validation';
+import { CreateAccountDto } from '../../core/modules/account/dto/create-account.dto';
 
-import { CreateUserDto } from '../../core/modules/user/dto/create-user.dto';
-
-export class RegistrationDto extends PickType(CreateUserDto, [
-  'email',
-  'password',
-] as const) {
-  @ApiProperty()
-  @IsString()
-  @MinLength(4)
-  @MaxLength(20)
-  @Match('password', { message: 'Password not match.' })
-  passwordConfirm!: string;
+export class RegistrationDto extends CreateAccountDto {
+  // @ApiProperty()
+  // @IsString()
+  // @MinLength(4)
+  // @MaxLength(20)
+  // @Match('password', { message: 'Password not match.' })
+  // passwordConfirm!: string;
 }

@@ -1,7 +1,6 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { createParamDecorator, NotFoundException } from '@nestjs/common';
-
-import { UserRoles } from '../../core/modules/user/consts/user-roles.enum';
+import { AccountRoles } from 'src/modules/permission/consts/permission.const';
 
 export const IsAdmin = createParamDecorator(
   (_data: unknown, ectx: ExecutionContext): boolean => {
@@ -9,11 +8,12 @@ export const IsAdmin = createParamDecorator(
       const ctx = ectx.switchToHttp();
       const req = ctx.getRequest<CustomRequest>();
 
-      const isAdmin = req.user?.roles.includes(UserRoles.ADMIN);
+      const isAdmin = req.user?.roles?.includes(AccountRoles.ADMIN);
 
       return Boolean(isAdmin);
     }
 
-    throw new NotFoundException('Not found user data.');
+    // TODO: Create error instance
+    throw new NotFoundException('Not found account data.');
   },
 );

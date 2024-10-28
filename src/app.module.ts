@@ -7,11 +7,13 @@ import { ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 
 import { AuthModule } from './modules/auth/auth.module';
+import { CacheCustomModule } from './modules/cache-custom/cache-custom.module';
 import { ValidationConfig } from './modules/configuration/configs/validation.config';
 import { ConfigurationModule } from './modules/configuration/configuration.module';
 import { CoreModule } from './modules/core/core.module';
-import { CustomLoggerModule } from './modules/custom-logger/custom-logger.module';
 import { DatabaseModule } from './modules/database/database.module';
+import { EventEmitterCustomModule } from './modules/event-emitter-custom/event-emitter-custom.module';
+import { LoggerCustomModule } from './modules/logger-custom/logger-custom.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { ThrottlerCustomModule } from './modules/throttler-custom/throttler-custom.module';
 import { ExceptionsLoggerFilter } from './shared/filters/exceptions-logger.filter';
@@ -21,9 +23,11 @@ import { ExceptionsLoggerFilter } from './shared/filters/exceptions-logger.filte
     ConfigurationModule,
     ThrottlerCustomModule,
     PermissionModule,
-    CustomLoggerModule,
+    LoggerCustomModule,
     AuthModule,
     DatabaseModule,
+    EventEmitterCustomModule,
+    CacheCustomModule,
 
     CoreModule,
   ],

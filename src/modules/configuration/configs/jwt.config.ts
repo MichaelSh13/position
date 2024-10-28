@@ -18,6 +18,7 @@ export default registerAs('jwt', async (): Promise<Options> => {
       },
     },
     refresh: { secret: process.env.JWT_USER_REFRESH_SECRET },
+    mail: { secret: process.env.EMAIL_JWT_SECRET },
   };
 
   const instance = plainToInstance(JwtDto, options);

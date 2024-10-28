@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { CaslModule } from 'nest-casl';
 
-import { UserRoles } from './permission.type.dt';
+import { AccountRoles } from './consts/permission.const';
 
 @Module({
-  imports: [CaslModule.forRoot<UserRoles>({})],
+  imports: [CaslModule.forRoot<AccountRoles>({})],
 })
 export class PermissionModule {}
