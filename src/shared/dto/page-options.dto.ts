@@ -8,7 +8,8 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { Order } from 'src/app.dt';
+
+import { Order } from '../consts/order.const';
 
 export class PageOptionsDto {
   @IsEnum(Order)

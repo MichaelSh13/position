@@ -1,27 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { TypeOrmModule } from '@nestjs/typeorm';
-
-import { CustomLoggerTypeOrmService } from '../custom-logger/services/custom-logger-typeorm.service';
+import { MongooseModule, MongooseModuleFactoryOptions } from '@nestjs/mongoose';
 
 @Module({
   imports: [
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService, CustomLoggerTypeOrmService],
-      useFactory: async (
-        configService: ConfigService,
-        loggerTypeOrmService: CustomLoggerTypeOrmService,
-      ) =>
-        // TODO: Use ConfigServices enum or something else instead of 'database' string. Change in all places for configurations!
-        {
-          const db = configService.getOrThrow<TypeOrmModuleOptions>('database');
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const db =
+          configService.getOrThrow<MongooseModuleFactoryOptions>('database');
 
-          return {
-            ...db,
-            logger: loggerTypeOrmService,
-          } as TypeOrmModuleOptions;
-        },
+        return db;
+      },
     }),
   ],
 })

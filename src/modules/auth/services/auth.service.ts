@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import * as bcryptjs from 'bcryptjs';
 import { instanceToPlain, plainToInstance } from 'class-transformer';
+import { User } from 'src/modules/core/modules/user/models/user.model';
 
 import type { LoginResponseDto } from '../dto/login-response.dto';
 import type { RegistrationDto } from '../dto/registration.dto';
-import { UserEntity } from '../../core/modules/user/entities/user.entity';
 import { UserService } from '../../core/modules/user/services/user.service';
 import { JsonWebTokenService } from '../../json-web-token/services/json-web-token.service';
 
@@ -20,7 +20,7 @@ export class AuthService {
     private readonly userService: UserService,
   ) {}
 
-  public async login(user: UserEntity) {
+  public async login(user: User) {
     // const permissions = await this.permissionService.getByUser(user.id);
 
     // const payload: UserEntity = {

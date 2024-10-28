@@ -6,7 +6,7 @@ import * as compression from 'compression';
 import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 
-import { DEFAULT_PORT } from './app.dt';
+import { DEFAULT_PORT } from './app.const';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

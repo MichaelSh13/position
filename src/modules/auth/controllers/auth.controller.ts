@@ -8,7 +8,7 @@ import { LoginResponseDto } from '../dto/login-response.dto';
 import { RegistrationDto } from '../dto/registration.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
-import { UserEntity } from '../../core/modules/user/entities/user.entity';
+import { UserEntity } from '../../core/modules/user/models/user.model';
 
 @IsPublic()
 @ApiTags('Auth')

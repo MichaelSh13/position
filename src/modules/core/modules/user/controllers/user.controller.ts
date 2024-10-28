@@ -5,23 +5,23 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { ValidationErrorResponse } from 'src/dto/validation-error.response';
 import { UserData } from 'src/modules/auth/decorators/user.decorator';
+import { ValidationErrorResponse } from 'src/shared/dto/validation-error.response';
 
-import { UserEntity } from '../entities/user.entity';
+import { User } from '../models/user.model';
 
 @ApiTags('User')
 @ApiSecurity('JWT-auth')
 @Controller('')
 export class UserController {
   @Get('/users/me')
-  @ApiResponse({ type: UserEntity })
+  @ApiResponse({ type: User })
   @ApiBadRequestResponse({
     description: 'Validation exception.',
     type: ValidationErrorResponse,
     isArray: true,
   })
-  getMe(@UserData() user: UserEntity) {
+  getMe(@UserData() user: User) {
     return user;
   }
 }
