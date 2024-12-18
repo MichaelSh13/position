@@ -27,8 +27,8 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'warn',
 
     // Enforce and autofix type-only imports using "import type"
-    "@typescript-eslint/consistent-type-exports": "warn",
-    "@typescript-eslint/consistent-type-imports": "warn",
+    '@typescript-eslint/consistent-type-exports': 'warn',
+    '@typescript-eslint/consistent-type-imports': 'warn',
 
     //#region =========== Unused Import ===========
     '@typescript-eslint/no-unused-vars': 'off',
@@ -46,41 +46,7 @@ module.exports = {
 
     //#region =========== Import Sort ===========
     'simple-import-sort/exports': 'warn',
-    'simple-import-sort/imports': [
-      'warn',
-      {
-        groups: [
-          // ext library & side effect imports
-          ['^@?\\w', '^\\u0000'],
-          // {s}css files
-          ['^.+\\.s?css$'],
-          // Lib and hooks
-          ['^@/lib', '^@/hooks'],
-          // static data
-          ['^@/data'],
-          // components
-          ['^@/components', '^@/container'],
-          // zustand store
-          ['^@/store'],
-          // Other imports
-          ['^@/'],
-          // relative paths up until 3 level
-          [
-            '^\\./?$',
-            '^\\.(?!/?$)',
-            '^\\.\\./?$',
-            '^\\.\\.(?!/?$)',
-            '^\\.\\./\\.\\./?$',
-            '^\\.\\./\\.\\.(?!/?$)',
-            '^\\.\\./\\.\\./\\.\\./?$',
-            '^\\.\\./\\.\\./\\.\\.(?!/?$)',
-          ],
-          ['^@/types'],
-          // other that didnt fit in
-          ['^'],
-        ],
-      },
-    ],
+    'simple-import-sort/imports': 'warn',
     //#endregion ======== Import Sort ===========
 
     //#region =========== Magic Numbers ===========

@@ -1,15 +1,10 @@
 import type { Request } from 'express';
 
-import type { EmailTypes } from './consts/email.const';
 import type { AccountEntity } from '../core/modules/account/entities/account.entity';
+import type { EmployerEntity } from '../core/modules/employer/entities/employer.entity';
+import type { EmailTypes } from './consts/email.const';
 
 declare global {
-  type PayloadAccount = {
-    account: AccountEntity;
-    iat: number;
-    exp: number;
-  };
-
   type CustomRequest = Request & {
     user?: AccountEntity;
   };
@@ -21,6 +16,7 @@ declare global {
 
   type AccountEntityWithEmployer = AccountEntity & {
     employerId: string;
+    employer: EmployerEntity;
   };
 
   type MailRequest = Request & {

@@ -13,6 +13,9 @@ import {
 
 import { EmployerEntity } from '../../employer/entities/employer.entity';
 import { JobApplicationEntity } from '../../job-application/entities/job-application.entity';
+import { AccountSystemStatus } from '../consts/account-system-status.const';
+import { AccountUserStatus } from '../consts/account-user-status.const';
+import { AccountInfoEntity } from './account-info.entity';
 
 @Exclude()
 @Entity({ name: 'account' })
@@ -25,22 +28,11 @@ export class AccountEntity extends CustomBaseEntity {
   })
   email?: string;
 
-  @Column('varchar', {
-    nullable: true,
-  })
-  password?: string;
-
   @Expose()
   @Column('varchar', {
     nullable: true,
   })
   phone?: string;
-
-  @Expose()
-  @Column('varchar', {
-    nullable: true,
-  })
-  countryCode?: string;
 
   // TODO: Make sure that there is no possibility to add ADMIN role for user.
   @ApiProperty({ enum: AccountRoles })
@@ -52,25 +44,34 @@ export class AccountEntity extends CustomBaseEntity {
   })
   roles!: AccountRoles[];
 
-  @ApiProperty({ type: Date })
-  @Expose()
-  @Column('timestamp with time zone', {
+  @Column('varchar', {
     nullable: true,
   })
-  emailVerifiedAt?: Date;
+  password?: string;
 
-  @ApiProperty({ type: Date })
-  @Expose()
-  @Column('timestamp with time zone', {
-    nullable: true,
+  @ApiProperty()
+  @Column('enum', {
+    enum: AccountSystemStatus,
+    default: AccountSystemStatus.UNVERIFIED,
   })
-  phoneVerifiedAt?: Date;
+  systemStatus: AccountSystemStatus;
 
-  @ApiProperty({ type: Boolean })
-  @Column('boolean', {
-    default: false,
+  @ApiProperty()
+  @Column('enum', {
+    enum: AccountUserStatus,
+    default: AccountUserStatus.ACTIVE,
   })
-  isBlocked: boolean;
+  userStatus: AccountUserStatus;
+
+  @ApiProperty()
+  @RelationId((acc: AccountEntity) => acc.info)
+  infoId: string;
+
+  @ApiProperty({ nullable: true })
+  @OneToOne(() => AccountInfoEntity, (info) => info.account, {
+    cascade: ['insert', 'remove', 'soft-remove', 'recover'],
+  })
+  info?: AccountInfoEntity;
 
   @Column({
     type: 'uuid',
@@ -90,20 +91,34 @@ export class AccountEntity extends CustomBaseEntity {
   )
   jobApplications?: JobApplicationEntity[];
 
-  static isVerified(account?: AccountEntity): boolean {
-    if (!account) {
-      return false;
-    }
-    const { phone, phoneVerifiedAt, email, emailVerifiedAt } = account;
+  static isActive(
+    account: AccountEntity,
+    options: AccountIsActiveOptions = {
+      error: false,
+      activated: true,
+      verification: true,
+    },
+  ): boolean {
+    if (
+      account.systemStatus !== AccountSystemStatus.VERIFIED &&
+      account.systemStatus !== AccountSystemStatus.UNVERIFIED
+    ) {
+      if (!options.error) return false;
 
-    if (!email && !phone) {
-      return false;
+      throw new Error(`Account is '${account.systemStatus}'.`);
     }
-    if (email && !emailVerifiedAt) {
-      return false;
+    if (options.activated && account.userStatus !== AccountUserStatus.ACTIVE) {
+      if (!options.error) return false;
+
+      throw new Error(`Account is '${account.userStatus}'.`);
     }
-    if (phone && !phoneVerifiedAt) {
-      return false;
+    if (
+      options.verification &&
+      account.systemStatus !== AccountSystemStatus.VERIFIED
+    ) {
+      if (!options.error) return false;
+
+      throw new Error(`Account is not '${AccountSystemStatus.VERIFIED}'.`);
     }
 
     return true;

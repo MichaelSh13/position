@@ -1,17 +1,20 @@
 import { Type } from 'class-transformer';
 import { IsUUID, ValidateNested } from 'class-validator';
 
-import { AccountEntity } from '../../account/entities/account.entity';
+import { EmployerEntity } from '../entities/employer.entity';
 
 export class EmployerVerifiedEventPayload {
+  @IsUUID()
+  accountId: string;
+
   @ValidateNested()
-  @Type(() => AccountEntity)
-  account: AccountEntity;
+  @Type(() => EmployerEntity)
+  employer: EmployerEntity;
 }
 
-export class EmployerVerifiedEvent implements BaseEvent {
+export class EmployerVerifiedEvent {
   @IsUUID()
-  id: string;
+  employerId: string;
 
   @ValidateNested()
   @Type(() => EmployerVerifiedEventPayload)

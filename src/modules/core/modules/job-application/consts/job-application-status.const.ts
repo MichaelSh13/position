@@ -21,6 +21,19 @@ export enum JobApplicationStatus {
   // TODO: Implement cron-job for this functionality.
   EXPIRED = 'EXPIRED',
 }
+export const activeJobApplicationStatuses = [
+  JobApplicationStatus.UNDER_REVIEW,
+  JobApplicationStatus.SHORTLISTED,
+  JobApplicationStatus.INTERVIEWING,
+  JobApplicationStatus.ASSESSMENT,
+  JobApplicationStatus.OFFER_EXTENDED,
+];
+export const closeJobApplicationStatuses = [
+  JobApplicationStatus.ACCEPTED,
+  JobApplicationStatus.REJECTED,
+  JobApplicationStatus.WITHDRAWN,
+  JobApplicationStatus.EXPIRED,
+];
 
 export enum JobApplicationClientsCommand {
   ACCEPT = 'accept',

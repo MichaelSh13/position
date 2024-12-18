@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
+import { EventEmitterService } from 'src/modules/event-emitter-custom/services/event-emitter-custom.service';
 import { Repository } from 'typeorm';
 
-import { PositionStatus } from '../consts/position.const';
 import { PositionEvents } from '../consts/position.event.const';
-import { PositionStatusCommand } from '../consts/position-status-commands.const';
+import { PositionSystemStatus } from '../consts/position-system-status.const';
+import { PositionUserStatus } from '../consts/position-user-status.const';
 import { CreatePositionDto } from '../dto/create-position.dto';
 import { UpdatePositionDto } from '../dto/update-position.dto';
 import { PositionEntity } from '../entities/position.entity';
+import { PositionChangedSystemStatusEvent } from '../events/position-changed-system-status.event';
+import { PositionChangedUserStatusEvent } from '../events/position-changed-user-status.event';
 import { PositionCreatedEvent } from '../events/position-created.event';
+import { PositionUpdatedEvent } from '../events/position-updated.event';
 
 @Injectable()
 export class PositionService {
@@ -18,7 +21,7 @@ export class PositionService {
     @InjectRepository(PositionEntity)
     private readonly positionRepository: Repository<PositionEntity>,
 
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventEmitterService: EventEmitterService,
   ) {}
 
   async createPosition(
@@ -32,20 +35,19 @@ export class PositionService {
         location,
         conditions,
         salaryCents: salary ? salary * 100 : undefined,
-        status: PositionStatus.PENDING,
         employerId,
       };
       const positionInst = this.positionRepository.create(positionData);
       const position = await this.positionRepository.save(positionInst);
 
       const payloadData: PositionCreatedEvent = {
-        id: employerId,
+        positionId: position.id,
         payload: {
           position,
         },
       };
       const payload = plainToInstance(PositionCreatedEvent, payloadData);
-      this.eventEmitter.emit(PositionEvents.CREATED, payload);
+      this.eventEmitterService.emit(PositionEvents.CREATED, payload);
 
       return position;
     } catch (err) {
@@ -79,41 +81,22 @@ export class PositionService {
       }
     }
 
-    return this.positionRepository.save(position);
-  }
+    const updatedPosition = await this.positionRepository.save(position);
 
-  async changePositionStatus(
-    employerId: string,
-    positionId: string,
-    command: PositionStatusCommand,
-  ): Promise<void> {
-    const position = await this.positionRepository.findOneBy({
-      id: positionId,
-    });
-    if (!position || position.employerId !== employerId) {
-      // TODO: handle error.
-      throw new BadRequestException('Position not found');
-    }
+    const updatedPayloadData: PositionUpdatedEvent = {
+      positionId: position.id,
+      payload: {
+        position,
+      },
+    };
+    const updatedPayload = plainToInstance(
+      PositionUpdatedEvent,
+      updatedPayloadData,
+    );
+    // TODO: Maybe need to use custom event emitter service, it allows e.g. to log or save events history.
+    this.eventEmitterService.emit(PositionEvents.UPDATED, updatedPayload);
 
-    let status: PositionStatus;
-    try {
-      status = this.checkPositionCommands(command, position.status);
-    } catch (err) {
-      // TODO: handle error.
-      throw new BadRequestException('Invalid command.', {
-        description: err?.message,
-      });
-    }
-
-    const updated = await this.positionRepository.update(position.id, {
-      status,
-    });
-    if (!updated.affected) {
-      // TODO: handle error.
-      throw new BadRequestException('Error during updating position.');
-    }
-
-    // TODO: emit event if position status is changed.
+    return updatedPosition;
   }
 
   async getPosition(id: string): Promise<PositionEntity> {
@@ -130,7 +113,7 @@ export class PositionService {
 
   async getActivePosition(id: string): Promise<PositionEntity> {
     const position = await this.getPosition(id);
-    if (position.status !== PositionStatus.ACTIVE) {
+    if (!PositionEntity.isActive(position)) {
       // TODO: custom error.
       throw new BadRequestException('Position is not active.');
     }
@@ -142,46 +125,114 @@ export class PositionService {
     return this.positionRepository.find();
   }
 
+  async changePositionSystemStatus(
+    positionId: string,
+    systemStatus: PositionSystemStatus,
+  ): Promise<void> {
+    const position = await this.positionRepository.findOneBy({
+      id: positionId,
+    });
+    if (!position) {
+      // TODO: handle error.
+      throw new BadRequestException('Position not found');
+    }
+
+    const { affected } = await this.positionRepository.update(position.id, {
+      systemStatus,
+    });
+    if (!affected) {
+      // TODO: handle error.
+      throw new BadRequestException('Error during updating position.');
+    }
+
+    const changedStatusPayloadData: PositionChangedSystemStatusEvent = {
+      positionId: position.id,
+      payload: { systemStatus },
+    };
+    const changedStatusPayload = plainToInstance(
+      PositionChangedSystemStatusEvent,
+      changedStatusPayloadData,
+    );
+    this.eventEmitterService.emit(
+      PositionEvents.UPDATED_SYSTEM_STATUS,
+      changedStatusPayload,
+    );
+  }
+
+  async changePositionUserStatus(
+    employerId: string,
+    positionId: string,
+    userStatus: PositionUserStatus,
+  ): Promise<void> {
+    const position = await this.positionRepository.findOneBy({
+      id: positionId,
+    });
+    if (!position || position.employerId !== employerId) {
+      // TODO: handle error.
+      throw new BadRequestException('Position not found');
+    }
+
+    try {
+      this.checkPositionCommands(userStatus, position.userStatus);
+    } catch (err) {
+      // TODO: handle error.
+      throw new BadRequestException('Invalid command.', {
+        description: err?.message,
+      });
+    }
+
+    const { affected } = await this.positionRepository.update(position.id, {
+      userStatus,
+    });
+    if (!affected) {
+      // TODO: handle error.
+      throw new BadRequestException('Error during updating position.');
+    }
+
+    const changedStatusPayloadData: PositionChangedUserStatusEvent = {
+      positionId: position.id,
+      payload: { userStatus },
+    };
+    const changedStatusPayload = plainToInstance(
+      PositionChangedUserStatusEvent,
+      changedStatusPayloadData,
+    );
+    this.eventEmitterService.emit(
+      PositionEvents.UPDATED_USER_STATUS,
+      changedStatusPayload,
+    );
+  }
+
   private checkPositionCommands(
-    command: PositionStatusCommand,
-    status: PositionStatus,
-  ) {
-    const commands: Record<
-      PositionStatusCommand,
-      (status: PositionStatus) => PositionStatus
+    toStatus: PositionUserStatus,
+    currStatus: PositionUserStatus,
+  ): never | void {
+    const statusesMap: Record<
+      PositionUserStatus,
+      (status: PositionUserStatus) => never | void
     > = {
-      [PositionStatusCommand.ACTIVE]: (status) => {
-        if (
-          status !== PositionStatus.INACTIVE &&
-          status !== PositionStatus.APPROVED
-        ) {
-          throw new Error('Position should be inactive or just approved.');
+      [PositionUserStatus.ACTIVE]: (status) => {
+        if (status !== PositionUserStatus.INACTIVE) {
+          throw new Error('Position may be activated only if it inactive.');
         }
-        return PositionStatus.ACTIVE;
       },
-      [PositionStatusCommand.INACTIVE]: (status) => {
-        if (status !== PositionStatus.ACTIVE) {
+      [PositionUserStatus.INACTIVE]: (status) => {
+        if (status === PositionUserStatus.INACTIVE) {
+          throw new Error('Position already is de-activated.');
+        }
+      },
+      [PositionUserStatus.ON_HOLD]: (status) => {
+        if (status !== PositionUserStatus.ACTIVE) {
           throw new Error('Position should be active.');
         }
-
-        return PositionStatus.INACTIVE;
       },
-      [PositionStatusCommand.ARCHIVE]: (status) => {
-        if (status !== PositionStatus.INACTIVE) {
-          throw new Error('Position should be inactive.');
+      [PositionUserStatus.ARCHIVED]: (status) => {
+        if (status !== PositionUserStatus.INACTIVE) {
+          throw new Error('Position should be de-activated.');
         }
-
-        return PositionStatus.ARCHIVED;
-      },
-      [PositionStatusCommand.UNARCHIVE]: (status) => {
-        if (status !== PositionStatus.ARCHIVED) {
-          throw new Error('Position should be archived.');
-        }
-
-        return PositionStatus.INACTIVE;
       },
     };
 
-    return commands[command](status);
+    return statusesMap[toStatus](currStatus);
   }
 }

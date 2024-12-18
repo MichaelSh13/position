@@ -1,9 +1,8 @@
 import type { Permissions } from 'nest-casl';
 import type { AccountRoles } from 'src/modules/permission/consts/permission.const';
 
+import type { AccountEntity } from '../account/entities/account.entity';
 import { JobApplicationEntity } from './entities/job-application.entity';
-import { AccountEntity } from '../account/entities/account.entity';
-import { EmployerEntity } from '../employer/entities/employer.entity';
 
 export enum JobApplicationActions {
   READ = 'read',
@@ -21,9 +20,9 @@ export const jobApplicationPermissions: Permissions<
   AccountEntity
 > = {
   CLIENT({ can, user }) {
-    if (!AccountEntity.isVerified(user)) {
-      return;
-    }
+    // if (!AccountEntity.isVerified(user)) {
+    //   return;
+    // }
 
     can(JobApplicationActions.READ, JobApplicationEntity);
     can(JobApplicationActions.CLIENT_READ, JobApplicationEntity);
@@ -31,9 +30,10 @@ export const jobApplicationPermissions: Permissions<
     can(JobApplicationActions.CLIENT_MANAGE, JobApplicationEntity);
   },
   EMPLOYER({ can, user }) {
-    if (!EmployerEntity.isVerified(user.employer, user)) {
-      return;
-    }
+    // TODO!: put right permissions.
+    // if (!EmployerEntity.isVerified(user.employer, user)) {
+    //   return;
+    // }
 
     can(JobApplicationActions.READ, JobApplicationEntity);
     can(JobApplicationActions.EMPLOYER_READ, JobApplicationEntity);

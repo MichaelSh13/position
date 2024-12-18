@@ -2,9 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CustomBaseEntity } from 'src/shared/models/custom-base.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-import { PositionStatus } from '../consts/position.const';
 import { EmployerEntity } from '../../employer/entities/employer.entity';
 import { JobApplicationEntity } from '../../job-application/entities/job-application.entity';
+import { PositionSystemStatus } from '../consts/position-system-status.const';
+import { PositionUserStatus } from '../consts/position-user-status.const';
 
 @Entity({ name: 'position' })
 export class PositionEntity extends CustomBaseEntity {
@@ -37,10 +38,30 @@ export class PositionEntity extends CustomBaseEntity {
 
   @ApiProperty()
   @Column('enum', {
-    enum: PositionStatus,
-    default: PositionStatus.PENDING,
+    enum: PositionSystemStatus,
+    default: PositionSystemStatus.PENDING,
   })
-  status: PositionStatus;
+  systemStatus: PositionSystemStatus;
+
+  @ApiProperty()
+  @Column('enum', {
+    enum: PositionUserStatus,
+    default: PositionUserStatus.INACTIVE,
+  })
+  userStatus: PositionUserStatus;
+
+  @ApiProperty()
+  @Column('boolean', {
+    default: true,
+  })
+  isParentActive: boolean;
+
+  @ApiProperty({ type: String, nullable: true })
+  @Column('varchar', {
+    nullable: true,
+  })
+  // TODO: If we have reason only when parent is not active, so lets just remove isSystemActive and check if reason exist.
+  reason?: string;
 
   @ApiProperty()
   @Column('uuid')
@@ -55,4 +76,46 @@ export class PositionEntity extends CustomBaseEntity {
     (jobApplication) => jobApplication.position,
   )
   jobApplications?: JobApplicationEntity[];
+
+  static isActive(
+    position: PositionEntity,
+    options: PositionIsActiveOption = {
+      error: false,
+      approving: true,
+      activated: true,
+      parent: true,
+    },
+  ): boolean | never {
+    if (
+      position.systemStatus === PositionSystemStatus.BLOCKED ||
+      position.systemStatus === PositionSystemStatus.REJECTED
+    ) {
+      if (!options.error) return false;
+
+      throw new Error(`Position is '${position.systemStatus}'.`);
+    }
+    if (
+      options.approving &&
+      position.systemStatus !== PositionSystemStatus.APPROVED
+    ) {
+      if (!options.error) return false;
+
+      throw new Error(`Position is '${position.systemStatus}'.`);
+    }
+    if (options.parent && !position.isParentActive) {
+      if (!options.error) return false;
+
+      throw new Error(`Position is not active. Parent: '${position.reason}''.`);
+    }
+    if (
+      options.activated &&
+      position.userStatus !== PositionUserStatus.ACTIVE
+    ) {
+      if (!options.error) return false;
+
+      throw new Error(`Position is '${position.userStatus}'.`);
+    }
+
+    return true;
+  }
 }

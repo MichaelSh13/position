@@ -9,9 +9,9 @@ export class PositionUpdatedEventPayload {
   position: PositionEntity;
 }
 
-export class PositionUpdatedEvent implements BaseEvent {
+export class PositionUpdatedEvent {
   @IsUUID()
-  id: string;
+  positionId: string;
 
   @ValidateNested()
   @Type(() => PositionUpdatedEventPayload)

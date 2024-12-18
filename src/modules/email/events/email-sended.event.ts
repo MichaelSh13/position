@@ -1,8 +1,8 @@
 import { IsObject, IsUUID } from 'class-validator';
 
-export class EmailSendedEvent implements BaseEvent {
+export class EmailSendedEvent {
   @IsUUID()
-  id: string;
+  emailId: string;
 
   @IsObject()
   payload: Record<string, unknown>;
