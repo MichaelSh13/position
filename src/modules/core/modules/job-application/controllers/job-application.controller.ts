@@ -26,23 +26,21 @@ import { JobApplicationActions } from '../job-application.permission';
 import { JobApplicationService } from '../services/job-application.service';
 import { AccountEntity } from '../../account/entities/account.entity';
 
-// TODO!: Implement all events.
-
 @ApiTags('Job Application')
 @ApiSecurity('JWT-auth')
 @Controller('')
 export class JobApplicationController {
   constructor(private readonly jobApplicationService: JobApplicationService) {}
 
-  @Get('job-application/:id')
+  @Get('job-application/:jobApplicationId')
   @UseGuards(AccessGuard)
   @UseAbility(JobApplicationActions.READ, JobApplicationEntity)
   getJobApplication(
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('jobApplicationId', new ParseUUIDPipe()) jobApplicationId: string,
     @AccountData() account: AccountEntity,
   ): Promise<JobApplicationEntity> {
     return this.jobApplicationService.getJobApplication(
-      id,
+      jobApplicationId,
       account.id,
       account.employerId,
     );
@@ -88,12 +86,12 @@ export class JobApplicationController {
     );
   }
 
-  @Patch('client/job-application/:id/:command')
+  @Patch('client/job-application/:jobApplicationId/:command')
   @HttpCode(204)
   @UseGuards(AccessGuard)
   @UseAbility(JobApplicationActions.CLIENT_MANAGE, JobApplicationEntity)
   updateClientJobApplicationStatus(
-    @Param('id', new ParseUUIDPipe()) jobApplicationId: string,
+    @Param('jobApplicationId', new ParseUUIDPipe()) jobApplicationId: string,
     @Param('command', new ParseEnumPipe(JobApplicationClientsCommand))
     command: JobApplicationClientsCommand,
     @AccountData() account: AccountEntity,
@@ -105,12 +103,12 @@ export class JobApplicationController {
     );
   }
 
-  @Patch('employer/job-application/:id/:status')
+  @Patch('employer/job-application/:jobApplicationId/:status')
   @HttpCode(204)
   @UseGuards(AccessGuard)
   @UseAbility(JobApplicationActions.EMPLOYER_MANAGE, JobApplicationEntity)
   updateEmployerJobApplicationStatus(
-    @Param('id', new ParseUUIDPipe()) jobApplicationId: string,
+    @Param('jobApplicationId', new ParseUUIDPipe()) jobApplicationId: string,
     @Param('command', new ParseEnumPipe(JobApplicationEmployersCommand))
     command: JobApplicationEmployersCommand,
     @AccountData() account: AccountEntityWithEmployer,

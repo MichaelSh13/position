@@ -1,17 +1,23 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MILLISECONDS_IN_DAY } from 'src/shared/consts/time.const';
+import { plainToInstance } from 'class-transformer';
+import { EventEmitterService } from 'src/modules/event-emitter-custom/services/event-emitter-custom.service';
+import { MS_IN_DAY } from 'src/shared/consts/time.const';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 
+import { PositionService } from '../../position/services/position.service';
+import { JobApplicationEvents } from '../consts/job-application.event.const';
 import {
   JobApplicationClientsCommand,
   JobApplicationEmployersCommand,
   JobApplicationStatus,
 } from '../consts/job-application-status.const';
+import { MIN_DAYS_BEFORE_SEND_JOB_APPLICATION } from '../consts/min-dats-before-send-job-application.const';
 import { CreateJobApplicationDto } from '../dto/create-job-application.dto';
 import { GetJobApplicationsDto } from '../dto/get-job-application.dto';
 import { JobApplicationEntity } from '../entities/job-application.entity';
-import { PositionService } from '../../position/services/position.service';
+import { JobApplicationChangedStatusEvent } from '../events/job-application-changed-status.event';
+import { JobApplicationCreatedEvent } from '../events/job-application-created.event';
 
 @Injectable()
 export class JobApplicationService {
@@ -20,6 +26,7 @@ export class JobApplicationService {
     private readonly jobApplicationRepository: Repository<JobApplicationEntity>,
 
     private readonly positionService: PositionService,
+    private readonly eventEmitterService: EventEmitterService,
   ) {}
 
   async create(
@@ -28,6 +35,10 @@ export class JobApplicationService {
     jobApplicationDto: CreateJobApplicationDto,
   ): Promise<JobApplicationEntity> {
     const position = await this.positionService.getActivePosition(positionId);
+    if (position.id === accountId) {
+      // TODO: Use custom exception.
+      throw new BadRequestException('You cannot apply for your own position.');
+    }
 
     const existedJobApplication = await this.jobApplicationRepository.findOne({
       where: {
@@ -39,15 +50,23 @@ export class JobApplicationService {
       },
     });
     if (existedJobApplication) {
+      // TODO: Use some utils or time library.
       const diffsInMs = Math.abs(
         existedJobApplication.createdAt.getTime() - new Date().getTime(),
       );
-      const diffsInDays = diffsInMs / MILLISECONDS_IN_DAY;
+      const diffsInDays = diffsInMs / MS_IN_DAY;
 
-      if (diffsInDays > 30) {
+      if (!JobApplicationEntity.isClose(existedJobApplication.status)) {
+        // TODO: error
+        throw new BadRequestException(
+          'You already have active job application for this position.',
+        );
+      }
+
+      if (diffsInDays > MIN_DAYS_BEFORE_SEND_JOB_APPLICATION) {
         // TODO: custom error.
         throw new BadRequestException(
-          'You have already submitted a job application for this position within the last 30 days.',
+          `You have already submitted a job application for this position within the last ${MIN_DAYS_BEFORE_SEND_JOB_APPLICATION} days.`,
         );
       }
     }
@@ -66,9 +85,17 @@ export class JobApplicationService {
     const jobApplication =
       await this.jobApplicationRepository.save(jobApplicationInst);
 
-    // TODO: Emit event that jobApplication is created.
-    // TODO: Set cron-job that will reject (or something like that) too old job-applications.
-    // TODO: Make sure that user can't send new job-applications if there is previous processing status job-application.
+    const createdPayloadData: JobApplicationCreatedEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        jobApplication,
+      },
+    };
+    const createdPayload = plainToInstance(
+      JobApplicationCreatedEvent,
+      createdPayloadData,
+    );
+    this.eventEmitterService.emit(JobApplicationEvents.CREATED, createdPayload);
 
     return jobApplication;
   }
@@ -111,6 +138,8 @@ export class JobApplicationService {
     }
   }
 
+  // TODO!: Create active status list and not-active. Use it for getting only active, or not positions.
+
   async getJobApplications(
     accountId: string,
     queryParams: GetJobApplicationsDto,
@@ -144,7 +173,7 @@ export class JobApplicationService {
     });
   }
 
-  checkJoabApplicationClientCommand(
+  private checkJobApplicationClientCommand(
     command: JobApplicationClientsCommand,
     currStatus: JobApplicationStatus,
   ) {
@@ -195,27 +224,53 @@ export class JobApplicationService {
 
     // TODO: If withdrawn less than (5) minutes ago, so allow to undo this.
 
-    const status = this.checkJoabApplicationClientCommand(
+    const status = this.checkJobApplicationClientCommand(
       command,
       jobApplication.status,
     );
     jobApplication.status = status;
 
-    const updated = await this.jobApplicationRepository.update(
+    const { affected } = await this.jobApplicationRepository.update(
       jobApplication.id,
       {
-        status,
+        status: jobApplication.status,
       },
     );
-    if (!updated.affected) {
+    if (!affected) {
       // TODO: handle error.
       throw new BadRequestException('Error during updating Job Application.');
     }
 
-    // TODO: emit event
+    // Emit events
+    const changedStatusPayloadData: JobApplicationChangedStatusEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        jobApplication,
+      },
+    };
+    const changedStatusPayload = plainToInstance(
+      JobApplicationChangedStatusEvent,
+      changedStatusPayloadData,
+    );
+    this.eventEmitterService.emit(
+      JobApplicationEvents.CHANGED_STATUS,
+      changedStatusPayload,
+    );
+
+    const updatedPayloadData: JobApplicationCreatedEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        jobApplication,
+      },
+    };
+    const updatedPayload = plainToInstance(
+      JobApplicationCreatedEvent,
+      updatedPayloadData,
+    );
+    this.eventEmitterService.emit(JobApplicationEvents.UPDATED, updatedPayload);
   }
 
-  checkJoabApplicationEmployerCommand(
+  private checkJobApplicationEmployerCommand(
     command: JobApplicationEmployersCommand,
     currStatus: JobApplicationStatus,
   ) {
@@ -323,7 +378,7 @@ export class JobApplicationService {
       throw new BadRequestException('Position not found.');
     }
 
-    const status = this.checkJoabApplicationEmployerCommand(
+    const status = this.checkJobApplicationEmployerCommand(
       command,
       jobApplication.status,
     );
@@ -332,7 +387,7 @@ export class JobApplicationService {
     const updated = await this.jobApplicationRepository.update(
       jobApplication.id,
       {
-        status,
+        status: jobApplication.status,
       },
     );
     if (!updated.affected) {
@@ -340,6 +395,31 @@ export class JobApplicationService {
       throw new BadRequestException('Error during updating Job Application.');
     }
 
-    // TODO: emit event
+    const changedStatusPayloadData: JobApplicationChangedStatusEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        jobApplication,
+      },
+    };
+    const changedStatusPayload = plainToInstance(
+      JobApplicationChangedStatusEvent,
+      changedStatusPayloadData,
+    );
+    this.eventEmitterService.emit(
+      JobApplicationEvents.CHANGED_STATUS,
+      changedStatusPayload,
+    );
+
+    const updatedPayloadData: JobApplicationCreatedEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        jobApplication,
+      },
+    };
+    const updatedPayload = plainToInstance(
+      JobApplicationCreatedEvent,
+      updatedPayloadData,
+    );
+    this.eventEmitterService.emit(JobApplicationEvents.UPDATED, updatedPayload);
   }
 }

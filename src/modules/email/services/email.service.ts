@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MailerService } from '@nestjs-modules/mailer';
 import { plainToInstance } from 'class-transformer';
 import { SentMessageInfo } from 'nodemailer';
 import { CONFIRM_EMAIL_ENDPOINT_NAME } from 'src/modules/auth/consts/endpoint-names.const';
 import { CommonDto } from 'src/modules/configuration/dto/common.dto';
+import { EventEmitterService } from 'src/modules/event-emitter-custom/services/event-emitter-custom.service';
 
 import { EmailEvents } from '../consts/email.event.const';
 import { EmailSendedEvent } from '../events/email-sended.event';
@@ -18,7 +18,7 @@ export class EmailService {
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
 
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventEmitterService: EventEmitterService,
   ) {
     const { port } = this.configService.getOrThrow<CommonDto>('common');
     // TODO: Create better way, including versioning system.
@@ -43,11 +43,11 @@ export class EmailService {
       });
 
       const payloadData: EmailSendedEvent = {
-        id: result.id,
+        emailId: result.id,
         payload: result,
       };
       const payload = plainToInstance(EmailSendedEvent, payloadData);
-      this.eventEmitter.emit(EmailEvents.SENDED, payload);
+      this.eventEmitterService.emit(EmailEvents.SENDED, payload);
 
       // TODO: logger info.
       return result;

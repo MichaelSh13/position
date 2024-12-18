@@ -2,7 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CustomBaseEntity } from 'src/shared/models/custom-base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
-import { JobApplicationStatus } from '../consts/job-application-status.const';
+import {
+  activeJobApplicationStatuses,
+  closeJobApplicationStatuses,
+  JobApplicationStatus,
+} from '../consts/job-application-status.const';
 import { AccountEntity } from '../../account/entities/account.entity';
 import { PositionEntity } from '../../position/entities/position.entity';
 
@@ -47,4 +51,20 @@ export class JobApplicationEntity extends CustomBaseEntity {
   @ManyToOne(() => PositionEntity, (position) => position.jobApplications)
   @JoinColumn({ name: 'positionId' })
   position?: PositionEntity;
+
+  static isActive(status: JobApplicationStatus): boolean {
+    if (activeJobApplicationStatuses.includes(status)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static isClose(status: JobApplicationStatus): boolean {
+    if (closeJobApplicationStatuses.includes(status)) {
+      return true;
+    }
+
+    return false;
+  }
 }

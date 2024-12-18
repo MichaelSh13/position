@@ -8,6 +8,7 @@ import helmet from 'helmet';
 
 import { DEFAULT_PORT } from './app.const';
 import { AppModule } from './app.module';
+import { PayloadAccount } from './modules/auth/dto/payload-account.dto';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -46,7 +47,9 @@ async function bootstrap() {
       'JWT-auth',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    extraModels: [PayloadAccount],
+  });
   SwaggerModule.setup('api', app, document);
 
   await app.listen(PORT);

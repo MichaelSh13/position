@@ -3,11 +3,17 @@ import { IsUUID, ValidateNested } from 'class-validator';
 
 import { AccountEntity } from '../entities/account.entity';
 
-export class AccountCreatedEvent implements BaseEvent {
-  @IsUUID()
-  id: string;
-
+export class AccountCreatedEventPayload {
   @ValidateNested()
   @Type(() => AccountEntity)
-  payload: AccountEntity;
+  account: AccountEntity;
+}
+
+export class AccountCreatedEvent {
+  @IsUUID()
+  accountId: string;
+
+  @ValidateNested()
+  @Type(() => AccountCreatedEventPayload)
+  payload: AccountCreatedEventPayload;
 }

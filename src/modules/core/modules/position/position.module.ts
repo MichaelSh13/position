@@ -4,6 +4,8 @@ import { CaslModule } from 'nest-casl';
 
 import { PositionController } from './controllers/position.controller';
 import { PositionEntity } from './entities/position.entity';
+import { PositionHandlerService } from './handlers/position.handler.service';
+import { PositionJobService } from './jobs/position.job.service';
 import { positionPermissions } from './position.permission';
 import { PositionService } from './services/position.service';
 
@@ -13,7 +15,7 @@ import { PositionService } from './services/position.service';
     CaslModule.forFeature({ permissions: positionPermissions }),
   ],
   controllers: [PositionController],
-  providers: [PositionService],
+  providers: [PositionService, PositionHandlerService, PositionJobService],
   exports: [PositionService],
 })
 export class PositionModule {}
