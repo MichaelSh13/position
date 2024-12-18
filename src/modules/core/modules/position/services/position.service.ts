@@ -29,6 +29,7 @@ export class PositionService {
     { description, title, conditions, location, salary }: CreatePositionDto,
   ): Promise<PositionEntity> {
     try {
+      console.log('');
       const positionData: Partial<PositionEntity> = {
         title,
         description,
