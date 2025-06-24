@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { AccessGuard, Actions, UseAbility } from 'nest-casl';
 import { AccountData } from 'src/modules/auth/decorators/account-data.decorator';
+import { IsPublic } from 'src/modules/auth/decorators/is-public.decorator';
 import { ValidationErrorResponse } from 'src/shared/dto/validation-error.response';
 
 import { AccountSystemStatus } from '../consts/account-system-status.const';
@@ -38,7 +39,24 @@ export class AccountController {
   })
   @UseGuards(AccessGuard)
   @UseAbility(Actions.read, AccountEntity)
-  getMe(@AccountData() account: AccountEntity) {
+  async getMe(@AccountData() account: AccountEntity) {
+    const accInfo = await this.accountService.getAccountInfo(account.infoId);
+
+    account.info = accInfo;
+
+    return account;
+  }
+
+  @Get('/:accountId/with-info')
+  @ApiResponse({ type: AccountEntity })
+  @IsPublic()
+  async getAccountWithInfo(
+    @Param('accountId', new ParseUUIDPipe()) accountId: string,
+  ) {
+    const account = await this.accountService.getAccount(accountId, {
+      info: true,
+    });
+
     return account;
   }
 

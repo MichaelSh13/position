@@ -4,9 +4,9 @@ import { MailerModule, MailerOptions } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
 
-import { EmailService } from './services/email.service';
 import { EmailDto } from '../configuration/dto/email.dto';
 import { JsonWebTokenModule } from '../json-web-token/json-web-token.module';
+import { EmailService } from './services/email.service';
 
 @Module({
   imports: [

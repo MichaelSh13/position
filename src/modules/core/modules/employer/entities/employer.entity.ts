@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { CustomBaseEntity } from 'src/shared/models/custom-base.entity';
 import {
   Column,
@@ -11,6 +12,7 @@ import {
 
 import { AccountEntity } from '../../account/entities/account.entity';
 import { PositionEntity } from '../../position/entities/position.entity';
+import { RatingEntity } from '../../rating/entities/rating.entity';
 import { EmployerSystemStatus } from '../consts/employer-system-status.const';
 import { EmployerUserStatus } from '../consts/employer-user-status.const';
 import { EmployerInfoEntity } from './employer-info.entity';
@@ -46,24 +48,26 @@ export class EmployerEntity extends CustomBaseEntity {
   })
   isParentActive: boolean;
 
-  @Column({
-    type: 'uuid',
-  })
-  @RelationId((acc: EmployerEntity) => acc.info)
+  @ApiProperty()
+  @RelationId((employer: EmployerEntity) => employer.info)
   infoId: string;
 
   @ApiProperty({ nullable: true })
   @OneToOne(() => EmployerInfoEntity, (info) => info.employer, {
     cascade: ['insert', 'remove', 'soft-remove', 'recover'],
   })
+  @Type(() => EmployerInfoEntity)
   info?: EmployerInfoEntity;
 
   @ApiProperty({ type: PositionEntity, isArray: true, nullable: true })
   @OneToMany(() => PositionEntity, (position) => position.employer)
   positions?: PositionEntity[];
 
+  @OneToMany(() => RatingEntity, (rating) => rating.account)
+  ratings?: RatingEntity[];
+
   static isActive(
-    employer: EmployerEntity,
+    employer: EmployerEntity | undefined,
     options: EmployerIsActiveOptions = {
       error: false,
       verification: true,
@@ -71,6 +75,12 @@ export class EmployerEntity extends CustomBaseEntity {
       parent: true,
     },
   ): boolean {
+    if (!employer) {
+      if (!options.error) return false;
+
+      throw new Error(`Employer not exist.`);
+    }
+
     if (
       employer.systemStatus === EmployerSystemStatus.RESTRICTED ||
       employer.systemStatus === EmployerSystemStatus.BLOCKED

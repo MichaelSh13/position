@@ -114,6 +114,12 @@ export class AuthService {
     if (!account.password) {
       throw new BadRequestException('Reset your password please.');
     }
+
+    const valid = await bcryptjs.compare(password, account.password);
+    if (!valid) {
+      throw new BadRequestException('Wrong password.');
+    }
+
     try {
       AccountEntity.isActive(account, {
         error: true,
@@ -122,12 +128,7 @@ export class AuthService {
       });
     } catch (error) {
       // TODO: error.
-      throw new UnauthorizedException(error.message);
-    }
-
-    const valid = await bcryptjs.compare(password, account.password);
-    if (!valid) {
-      throw new ForbiddenException('Wrong password.');
+      throw new ForbiddenException(error.message);
     }
 
     // TODO: use better methods to exclude properties.

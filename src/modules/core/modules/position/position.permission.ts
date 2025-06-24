@@ -2,25 +2,26 @@ import type { Permissions } from 'nest-casl';
 import { Actions } from 'nest-casl';
 import type { AccountRoles } from 'src/modules/permission/consts/permission.const';
 
+import { EmployerEntity } from '../employer/entities/employer.entity';
 import { PositionEntity } from './entities/position.entity';
-import type { AccountEntity } from '../account/entities/account.entity';
 
 export const positionPermissions: Permissions<
   AccountRoles,
   PositionEntity,
   Actions,
-  AccountEntity
+  AccountEntityWithEmployer
 > = {
   everyone({ can }) {
     can(Actions.read, PositionEntity);
   },
   EMPLOYER({ can, user }) {
-    // TODO!: put right permissions.
-    // if (!EmployerEntity.isVerified(user.employer, user)) {
-    //   return;
-    // }
-    // TODO: Ban/Black list check during validation tokens refresh and login.
+    if (!EmployerEntity.isActive(user.employer, { verification: false }))
+      return;
+
     can(Actions.create, PositionEntity);
+
+    if (!EmployerEntity.isActive(user.employer)) return;
+
     can(Actions.update, PositionEntity);
     can(Actions.delete, PositionEntity);
   },

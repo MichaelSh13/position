@@ -39,8 +39,6 @@ export class AuthController {
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiBody({ type: LoginDto })
   login(@AccountData() account: AccountEntity): Promise<LoginResponseDto> {
-    console.log('do it');
-
     return this.authService.login(account);
   }
 
@@ -53,6 +51,7 @@ export class AuthController {
   @Get(CONFIRM_EMAIL_ENDPOINT_NAME)
   @UseGuards(JwtMailGuard)
   @SetMail(EmailTypes.VERIFICATION)
+  // TODO: Redirect to frontend or app. Or redirect to frontend and this will automatically redirect to app.
   @Redirect()
   confirmEmail(@MailData() confirmationDto: ConfirmationDto) {
     return this.authService.confirmEmail(confirmationDto);

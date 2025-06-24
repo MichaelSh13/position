@@ -3,21 +3,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { EventEmitterService } from 'src/modules/event-emitter-custom/services/event-emitter-custom.service';
 import { MS_IN_DAY } from 'src/shared/consts/time.const';
-import { FindOptionsWhere, In, Repository } from 'typeorm';
+import { DeepPartial, FindOptionsWhere, In, Repository } from 'typeorm';
 
 import { PositionService } from '../../position/services/position.service';
 import { JobApplicationEvents } from '../consts/job-application.event.const';
-import {
-  JobApplicationClientsCommand,
-  JobApplicationEmployersCommand,
-  JobApplicationStatus,
-} from '../consts/job-application-status.const';
+import { JobApplicationClientStatus } from '../consts/job-application-client-status.const';
+import { JobApplicationSystemStatus } from '../consts/job-application-system-status.const';
+import { JobApplicationUserStatus } from '../consts/job-application-user-status.const';
 import { MIN_DAYS_BEFORE_SEND_JOB_APPLICATION } from '../consts/min-dats-before-send-job-application.const';
 import { CreateJobApplicationDto } from '../dto/create-job-application.dto';
 import { GetJobApplicationsDto } from '../dto/get-job-application.dto';
 import { JobApplicationEntity } from '../entities/job-application.entity';
-import { JobApplicationChangedStatusEvent } from '../events/job-application-changed-status.event';
 import { JobApplicationCreatedEvent } from '../events/job-application-created.event';
+import { JobApplicationUpdatedClientStatusEvent } from '../events/job-application-updated-client-status.event';
+import { JobApplicationUpdatedSystemStatusEvent } from '../events/job-application-updated-system-status.event';
+import { JobApplicationUpdatedUserStatusEvent } from '../events/job-application-updated-user-status.event';
 
 @Injectable()
 export class JobApplicationService {
@@ -33,9 +33,10 @@ export class JobApplicationService {
     accountId: string,
     positionId: string,
     jobApplicationDto: CreateJobApplicationDto,
+    employerId?: string,
   ): Promise<JobApplicationEntity> {
     const position = await this.positionService.getActivePosition(positionId);
-    if (position.id === accountId) {
+    if (position.employerId === employerId) {
       // TODO: Use custom exception.
       throw new BadRequestException('You cannot apply for your own position.');
     }
@@ -56,7 +57,7 @@ export class JobApplicationService {
       );
       const diffsInDays = diffsInMs / MS_IN_DAY;
 
-      if (!JobApplicationEntity.isClose(existedJobApplication.status)) {
+      if (JobApplicationEntity.isActive(existedJobApplication)) {
         // TODO: error
         throw new BadRequestException(
           'You already have active job application for this position.',
@@ -71,13 +72,13 @@ export class JobApplicationService {
       }
     }
 
-    const jobApplicationData: Partial<JobApplicationEntity> = {
+    const jobApplicationData: DeepPartial<JobApplicationEntity> = {
       accountId,
       positionId: position.id,
       resume: jobApplicationDto.resume,
       coverLetter: jobApplicationDto.coverLetter,
       conditions: jobApplicationDto.conditions,
-      status: JobApplicationStatus.SUBMITTED,
+      conversation: {},
     };
     const jobApplicationInst =
       this.jobApplicationRepository.create(jobApplicationData);
@@ -102,33 +103,37 @@ export class JobApplicationService {
 
   async getJobApplication(
     jobApplicationId: string,
-    accountId: string,
+    accountId?: string,
     employerId?: string,
   ): Promise<JobApplicationEntity> {
-    const jobApplication = await this.jobApplicationRepository.findOneBy({
-      id: jobApplicationId,
-    });
-    if (!jobApplication) {
-      // TODO: handle error.
-      throw new BadRequestException('Job application not found.');
-    }
-
-    if (jobApplication.accountId === accountId) {
-      return jobApplication;
-    }
-
-    if (!employerId) {
-      // TODO: handle error.
-      throw new BadRequestException('Job application not found.');
-    }
-
     try {
+      const jobApplication = await this.jobApplicationRepository.findOneBy({
+        id: jobApplicationId,
+      });
+      if (!jobApplication) {
+        // TODO: handle error.
+        throw new BadRequestException('Job application not found.');
+      }
+
+      if (jobApplication.accountId === accountId) {
+        return jobApplication;
+      }
+
+      if (!employerId) {
+        // TODO: handle error.
+        throw new BadRequestException(
+          'You are not owner of position of this job-application.',
+        );
+      }
+
       const position = await this.positionService.getPosition(
         jobApplication.positionId,
       );
       if (position.employerId !== employerId) {
         // TODO: handle error.
-        throw new BadRequestException('Job application not found.');
+        throw new BadRequestException(
+          'You are not owner of position of this job-application.',
+        );
       }
 
       return jobApplication;
@@ -138,9 +143,7 @@ export class JobApplicationService {
     }
   }
 
-  // TODO!: Create active status list and not-active. Use it for getting only active, or not positions.
-
-  async getJobApplications(
+  async getJobApplicationsSended(
     accountId: string,
     queryParams: GetJobApplicationsDto,
   ): Promise<JobApplicationEntity[]> {
@@ -157,7 +160,28 @@ export class JobApplicationService {
     });
   }
 
-  async getEmployersJobApplications(
+  async getEmployerJobApplications(
+    employerId: string,
+  ): Promise<JobApplicationEntity[]> {
+    const jobApplications = await this.jobApplicationRepository.find({
+      order: { createdAt: 'DESC' },
+      where: {
+        position: {
+          employerId,
+        },
+      },
+      relations: {
+        position: true,
+      },
+    });
+
+    console.log(jobApplications);
+    console.log(jobApplications.length);
+
+    return jobApplications;
+  }
+
+  async getPositionJobApplications(
     employerId: string,
     positionId: string,
   ): Promise<JobApplicationEntity[]> {
@@ -173,221 +197,26 @@ export class JobApplicationService {
     });
   }
 
-  private checkJobApplicationClientCommand(
-    command: JobApplicationClientsCommand,
-    currStatus: JobApplicationStatus,
-  ) {
-    const commands: Record<
-      JobApplicationClientsCommand,
-      (status: JobApplicationStatus) => JobApplicationStatus
-    > = {
-      [JobApplicationClientsCommand.ACCEPT]: (status) => {
-        if (status !== JobApplicationStatus.OFFER_EXTENDED) {
-          throw new BadRequestException('Account should have offer.');
-        }
-
-        return JobApplicationStatus.ACCEPTED;
-      },
-      [JobApplicationClientsCommand.WITHDRAW]: (status) => {
-        if (
-          status === JobApplicationStatus.WITHDRAWN ||
-          status === JobApplicationStatus.REJECTED ||
-          status === JobApplicationStatus.ACCEPTED ||
-          status === JobApplicationStatus.EXPIRED
-        ) {
-          // TODO: custom error.
-          throw new BadRequestException(
-            "Job Application shouldn't be already withdrawn or rejected, or accepted.",
-          );
-        }
-
-        return JobApplicationStatus.WITHDRAWN;
-      },
-    };
-
-    return commands[command](currStatus);
-  }
-
-  async updateClientJobApplicationStatus(
-    accountId: string,
-    jobApplicationId: string,
-    command: JobApplicationClientsCommand,
-  ): Promise<void> {
-    const jobApplication = await this.jobApplicationRepository.findOneBy({
-      id: jobApplicationId,
-      accountId,
-    });
-    if (!jobApplication) {
-      // TODO: handle error.
-      throw new BadRequestException('Job application not found.');
-    }
-
-    // TODO: If withdrawn less than (5) minutes ago, so allow to undo this.
-
-    const status = this.checkJobApplicationClientCommand(
-      command,
-      jobApplication.status,
-    );
-    jobApplication.status = status;
-
-    const { affected } = await this.jobApplicationRepository.update(
-      jobApplication.id,
-      {
-        status: jobApplication.status,
-      },
-    );
-    if (!affected) {
-      // TODO: handle error.
-      throw new BadRequestException('Error during updating Job Application.');
-    }
-
-    // Emit events
-    const changedStatusPayloadData: JobApplicationChangedStatusEvent = {
-      jobApplicationId: jobApplication.id,
-      payload: {
-        jobApplication,
-      },
-    };
-    const changedStatusPayload = plainToInstance(
-      JobApplicationChangedStatusEvent,
-      changedStatusPayloadData,
-    );
-    this.eventEmitterService.emit(
-      JobApplicationEvents.CHANGED_STATUS,
-      changedStatusPayload,
-    );
-
-    const updatedPayloadData: JobApplicationCreatedEvent = {
-      jobApplicationId: jobApplication.id,
-      payload: {
-        jobApplication,
-      },
-    };
-    const updatedPayload = plainToInstance(
-      JobApplicationCreatedEvent,
-      updatedPayloadData,
-    );
-    this.eventEmitterService.emit(JobApplicationEvents.UPDATED, updatedPayload);
-  }
-
-  private checkJobApplicationEmployerCommand(
-    command: JobApplicationEmployersCommand,
-    currStatus: JobApplicationStatus,
-  ) {
-    const commands: Record<
-      JobApplicationEmployersCommand,
-      (status: JobApplicationStatus) => JobApplicationStatus
-    > = {
-      [JobApplicationEmployersCommand.REJECT]: (status) => {
-        if (
-          status === JobApplicationStatus.REJECTED ||
-          status === JobApplicationStatus.EXPIRED ||
-          status === JobApplicationStatus.ACCEPTED ||
-          status === JobApplicationStatus.WITHDRAWN
-        ) {
-          throw new BadRequestException(
-            "Can't reject already rejected, expired, accepted or withdrawn job application.",
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-      [JobApplicationEmployersCommand.OFFER_EXTEND]: (status) => {
-        if (
-          status !== JobApplicationStatus.UNDER_REVIEW &&
-          status !== JobApplicationStatus.SHORTLISTED &&
-          status !== JobApplicationStatus.INTERVIEWING &&
-          status !== JobApplicationStatus.ASSESSMENT
-        ) {
-          throw new BadRequestException(
-            'Can make offer only for under review, shortlisted, interviewing, assessment job applications.',
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-      [JobApplicationEmployersCommand.REVIEW]: (status) => {
-        if (
-          status !== JobApplicationStatus.SHORTLISTED &&
-          status !== JobApplicationStatus.INTERVIEWING &&
-          status !== JobApplicationStatus.ASSESSMENT
-        ) {
-          throw new BadRequestException(
-            'You can review only shortlisted, interviewed, assessment job applications.',
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-      [JobApplicationEmployersCommand.SHORTLIST]: (status) => {
-        if (
-          status !== JobApplicationStatus.UNDER_REVIEW &&
-          status !== JobApplicationStatus.INTERVIEWING &&
-          status !== JobApplicationStatus.ASSESSMENT
-        ) {
-          throw new BadRequestException(
-            'You can review only under-review, interviewed, assessment job applications.',
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-      [JobApplicationEmployersCommand.INTERVIEW]: (status) => {
-        if (
-          status !== JobApplicationStatus.SHORTLISTED &&
-          status !== JobApplicationStatus.UNDER_REVIEW &&
-          status !== JobApplicationStatus.ASSESSMENT
-        ) {
-          throw new BadRequestException(
-            'You can review only shortlisted, under-review, assessment job applications.',
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-      [JobApplicationEmployersCommand.EVALUATE]: (status) => {
-        if (
-          status !== JobApplicationStatus.SHORTLISTED &&
-          status !== JobApplicationStatus.INTERVIEWING &&
-          status !== JobApplicationStatus.UNDER_REVIEW
-        ) {
-          throw new BadRequestException(
-            'You can review only shortlisted, interviewed, under-review job applications.',
-          );
-        }
-        return JobApplicationStatus.REJECTED;
-      },
-    };
-
-    return commands[command](currStatus);
-  }
-
-  async updateEmployerJobApplicationStatus(
+  async changeClientStatus(
     employerId: string,
     jobApplicationId: string,
-    command: JobApplicationEmployersCommand,
+    clientStatus: JobApplicationClientStatus,
   ): Promise<void> {
-    const jobApplication = await this.jobApplicationRepository.findOneBy({
-      id: jobApplicationId,
-    });
-    if (!jobApplication) {
-      // TODO: handle error.
-      throw new BadRequestException('Job application not found.');
-    }
-
-    const position = await this.positionService.getPosition(
-      jobApplication.positionId,
+    const jobApplication = await this.getJobApplication(
+      jobApplicationId,
+      undefined,
+      employerId,
     );
-    if (position.employerId !== employerId) {
-      // TODO: handle error.
-      throw new BadRequestException('Position not found.');
+    if (jobApplication.clientStatus === clientStatus) {
+      throw new BadRequestException(
+        `Job-application is already ${clientStatus}.`,
+      );
     }
-
-    const status = this.checkJobApplicationEmployerCommand(
-      command,
-      jobApplication.status,
-    );
-    jobApplication.status = status;
 
     const updated = await this.jobApplicationRepository.update(
       jobApplication.id,
       {
-        status: jobApplication.status,
+        clientStatus,
       },
     );
     if (!updated.affected) {
@@ -395,31 +224,142 @@ export class JobApplicationService {
       throw new BadRequestException('Error during updating Job Application.');
     }
 
-    const changedStatusPayloadData: JobApplicationChangedStatusEvent = {
+    const updatedEmployer: JobApplicationEntity = {
+      ...jobApplication,
+      clientStatus,
+    };
+    const wasJobApplicationActive =
+      JobApplicationEntity.isActive(jobApplication);
+    const isJobApplicationActive =
+      JobApplicationEntity.isActive(updatedEmployer);
+
+    const payloadData: JobApplicationUpdatedClientStatusEvent = {
       jobApplicationId: jobApplication.id,
       payload: {
-        jobApplication,
+        clientStatus,
+        isJobApplicationActive,
+        wasJobApplicationActivityChanged:
+          wasJobApplicationActive === isJobApplicationActive,
+      },
+    };
+    const payload: JobApplicationUpdatedClientStatusEvent = plainToInstance(
+      JobApplicationUpdatedClientStatusEvent,
+      payloadData,
+    );
+    this.eventEmitterService.emit(
+      JobApplicationEvents.UPDATED_CLIENT_STATUS,
+      payload,
+    );
+  }
+
+  async changeSystemStatus(
+    jobApplicationId: string,
+    systemStatus: JobApplicationSystemStatus,
+  ): Promise<void> {
+    const jobApplication = await this.jobApplicationRepository.findOneBy({
+      id: jobApplicationId,
+    });
+    if (!jobApplication) {
+      throw new BadRequestException('Job application not found.');
+    }
+    if (jobApplication.systemStatus === systemStatus) {
+      throw new BadRequestException(
+        `Job-application is already ${systemStatus}.`,
+      );
+    }
+
+    const { affected } = await this.jobApplicationRepository.update(
+      jobApplicationId,
+      {
+        systemStatus,
+      },
+    );
+    if (!affected) {
+      // TODO: handle error.
+      throw new BadRequestException('Error during updating position.');
+    }
+
+    const updatedJobApplication: JobApplicationEntity = {
+      ...jobApplication,
+      systemStatus,
+    };
+
+    const wasJobApplicationActive =
+      JobApplicationEntity.isActive(jobApplication);
+    const isJobApplicationActive = JobApplicationEntity.isActive(
+      updatedJobApplication,
+    );
+
+    const changedStatusPayloadData: JobApplicationUpdatedSystemStatusEvent = {
+      jobApplicationId: jobApplication.id,
+      payload: {
+        systemStatus,
+        isJobApplicationActive,
+        wasJobApplicationActivityChanged:
+          wasJobApplicationActive === isJobApplicationActive,
       },
     };
     const changedStatusPayload = plainToInstance(
-      JobApplicationChangedStatusEvent,
+      JobApplicationUpdatedSystemStatusEvent,
       changedStatusPayloadData,
     );
     this.eventEmitterService.emit(
-      JobApplicationEvents.CHANGED_STATUS,
+      JobApplicationEvents.UPDATED_SYSTEM_STATUS,
       changedStatusPayload,
     );
+  }
 
-    const updatedPayloadData: JobApplicationCreatedEvent = {
+  async changeUserStatus(
+    accountId: string,
+    jobApplicationId: string,
+    userStatus: JobApplicationUserStatus,
+  ): Promise<void> {
+    const jobApplication = await this.getJobApplication(
+      jobApplicationId,
+      accountId,
+    );
+    if (jobApplication.userStatus === userStatus) {
+      throw new BadRequestException(
+        `Job-application is already ${userStatus}.`,
+      );
+    }
+
+    const { affected } = await this.jobApplicationRepository.update(
+      jobApplication.id,
+      {
+        userStatus,
+      },
+    );
+    if (!affected) {
+      // TODO: handle error.
+      throw new BadRequestException('Error during updating Job Application.');
+    }
+
+    const updatedEmployer: JobApplicationEntity = {
+      ...jobApplication,
+      userStatus,
+    };
+    const wasJobApplicationActive =
+      JobApplicationEntity.isActive(jobApplication);
+    const isJobApplicationActive =
+      JobApplicationEntity.isActive(updatedEmployer);
+
+    const payloadData: JobApplicationUpdatedUserStatusEvent = {
       jobApplicationId: jobApplication.id,
       payload: {
-        jobApplication,
+        userStatus,
+        isJobApplicationActive,
+        wasJobApplicationActivityChanged:
+          wasJobApplicationActive === isJobApplicationActive,
       },
     };
-    const updatedPayload = plainToInstance(
-      JobApplicationCreatedEvent,
-      updatedPayloadData,
+    const payload: JobApplicationUpdatedUserStatusEvent = plainToInstance(
+      JobApplicationUpdatedUserStatusEvent,
+      payloadData,
     );
-    this.eventEmitterService.emit(JobApplicationEvents.UPDATED, updatedPayload);
+    this.eventEmitterService.emit(
+      JobApplicationEvents.UPDATED_USER_STATUS,
+      payload,
+    );
   }
 }

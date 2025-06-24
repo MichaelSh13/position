@@ -57,5 +57,3 @@ async function bootstrap() {
   console.log(`PORT: ${PORT};`);
 }
 bootstrap();
-
-// TODO: cache - skillcombo/backend

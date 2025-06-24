@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { AccountEvents } from 'src/modules/core/modules/account/consts/account.event.const';
-import { AccountBulkUpdatedSystemStatusEvent } from 'src/modules/core/modules/account/events/account-bulk-updated-system-status.event';
+import {
+  AccountBulkChangedActivityEvent,
+  AccountChangedActivityEvent,
+} from 'src/modules/core/modules/account/events/account-activity-changed.event';
 import { AccountChangedRoleEvent } from 'src/modules/core/modules/account/events/account-changed-role.event';
-import { AccountUpdatedSystemStatusEvent } from 'src/modules/core/modules/account/events/account-updated-system-status.event';
-import { AccountUpdatedUserStatusEvent } from 'src/modules/core/modules/account/events/account-updated-user-status.event';
 import { AccountVerifiedEmailEvent } from 'src/modules/core/modules/account/events/account-verified-email.event';
 import { EmployerEvents } from 'src/modules/core/modules/employer/consts/employer.event.const';
-import { EmployerBulkUpdatedSystemStatusEvent } from 'src/modules/core/modules/employer/events/employer-bulk-updated-system-status.event';
+import {
+  EmployerBulkChangedActivityEvent,
+  EmployerChangedActivityEvent,
+} from 'src/modules/core/modules/employer/events/employer-activity-changed.event';
 import { EmployerCreatedEvent } from 'src/modules/core/modules/employer/events/employer-created.event';
-import { EmployerUpdatedSystemStatusEvent } from 'src/modules/core/modules/employer/events/employer-updated-system-status.event';
-import { EmployerUpdatedUserStatusEvent } from 'src/modules/core/modules/employer/events/employer-updated-user-status.event';
-import { EmployerVerifiedEvent } from 'src/modules/core/modules/employer/events/employer-verified.event';
 import { HandleEvent } from 'src/modules/event-emitter-custom/decorators/handle-event.decorator';
 
 import { AuthService } from '../services/auth.service';
@@ -19,67 +20,43 @@ import { AuthService } from '../services/auth.service';
 export class AuthHandler {
   constructor(private readonly authService: AuthService) {}
 
-  // TODO: Deal with invalid account. Currently we may react on one event, this one trigger another and we react on this too and continue.
-
-  // ---------------------- start Account ----------------------
   @HandleEvent(AccountEvents.UPDATED_ROLE)
   async onAccountUpdateRole({ accountId }: AccountChangedRoleEvent) {
     this.authService.invalidAccount(accountId);
   }
-
-  @HandleEvent(AccountEvents.BULK_UPDATED_SYSTEM_STATUS)
-  onAccountBulkUpdateSystemStatus({
+  @HandleEvent(AccountEvents.UPDATED_ACTIVITY)
+  async onAccountUpdateActivity({ accountId }: AccountChangedActivityEvent) {
+    this.authService.invalidAccount(accountId);
+  }
+  @HandleEvent(AccountEvents.BULK_UPDATED_ACTIVITY)
+  async onAccountBulkUpdateActivity({
     payloads,
-  }: AccountBulkUpdatedSystemStatusEvent) {
+  }: AccountBulkChangedActivityEvent) {
     const accountIds = payloads.map(({ accountId }) => accountId);
 
     this.authService.invalidAccount(accountIds);
   }
-
-  @HandleEvent(AccountEvents.UPDATED_SYSTEM_STATUS)
-  onAccountUpdateSystemStatus({ accountId }: AccountUpdatedSystemStatusEvent) {
-    this.authService.invalidAccount(accountId);
-  }
-
-  @HandleEvent(AccountEvents.UPDATED_USER_STATUS)
-  onAccountUpdateUserStatus({ accountId }: AccountUpdatedUserStatusEvent) {
-    this.authService.invalidAccount(accountId);
-  }
-
   @HandleEvent(AccountEvents.VERIFIED_EMAIL)
-  onAccountVerifiedEmail({ accountId }: AccountVerifiedEmailEvent) {
+  async onAccountVerifyEmail({ accountId }: AccountVerifiedEmailEvent) {
     this.authService.invalidAccount(accountId);
   }
-  // ---------------------- end Account ----------------------
 
-  // ---------------------- start Account ----------------------
   @HandleEvent(EmployerEvents.CREATED)
-  onEmployerCreated({ payload: { accountId } }: EmployerCreatedEvent) {
+  async onEmployerCreate({ payload: { accountId } }: EmployerCreatedEvent) {
     this.authService.invalidAccount(accountId);
   }
-  @HandleEvent(EmployerEvents.UPDATED_SYSTEM_STATUS)
-  onEmployerUpdatedSystemStatus({
+  @HandleEvent(EmployerEvents.UPDATED_ACTIVITY)
+  async onEmployerUpdateActivity({
     payload: { accountId },
-  }: EmployerUpdatedSystemStatusEvent) {
+  }: EmployerChangedActivityEvent) {
     this.authService.invalidAccount(accountId);
   }
-  @HandleEvent(EmployerEvents.UPDATED_USER_STATUS)
-  onEmployerUpdatedUserStatus({
-    payload: { accountId },
-  }: EmployerUpdatedUserStatusEvent) {
-    this.authService.invalidAccount(accountId);
-  }
-  @HandleEvent(EmployerEvents.BULK_UPDATED_SYSTEM_STATUS)
-  onEmployerBulkUpdatedSystemStatus({
+  @HandleEvent(EmployerEvents.BULK_UPDATED_ACTIVITY)
+  async onEmployerBulkUpdateActivity({
     payloads,
-  }: EmployerBulkUpdatedSystemStatusEvent) {
+  }: EmployerBulkChangedActivityEvent) {
     const accountIds = payloads.map(({ accountId }) => accountId);
 
     this.authService.invalidAccount(accountIds);
   }
-  @HandleEvent(EmployerEvents.VERIFIED)
-  onEmployerVerified({ payload: { accountId } }: EmployerVerifiedEvent) {
-    this.authService.invalidAccount(accountId);
-  }
-  // ---------------------- end Account ----------------------
 }

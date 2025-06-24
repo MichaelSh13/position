@@ -1,14 +1,23 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsUUID, ValidateNested } from 'class-validator';
+import { IsBoolean, IsEnum, IsUUID, ValidateNested } from 'class-validator';
 
 import { PositionSystemStatus } from '../consts/position-system-status.const';
 
 export class PositionChangedSystemStatusEventPayload {
+  @IsUUID()
+  employerId: string;
+
   @IsEnum(PositionSystemStatus)
   systemStatus: PositionSystemStatus;
+
+  @IsBoolean()
+  isPositionActive: boolean;
+
+  @IsBoolean()
+  wasPositionActivityChanged: boolean;
 }
 
-export class PositionChangedSystemStatusEvent {
+export class PositionUpdatedSystemStatusEvent {
   @IsUUID()
   positionId: string;
 

@@ -11,12 +11,12 @@ export const accountPermissions: Permissions<
   AccountEntity
 > = {
   CLIENT({ can, user }) {
+    if (!AccountEntity.isActive(user, { verification: false })) {
+      return;
+    }
+
     can(Actions.read, AccountEntity);
     can(Actions.update, AccountEntity);
-
-    // if (!AccountEntity.isVerified(user)) {
-    //   return;
-    // }
   },
   ADMIN({ can }) {
     can(Actions.manage, AccountEntity);

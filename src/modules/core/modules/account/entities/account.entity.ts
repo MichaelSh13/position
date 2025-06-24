@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
 import { AccountRoles } from 'src/modules/permission/consts/permission.const';
 import { CustomBaseEntity } from 'src/shared/models/custom-base.entity';
 import {
@@ -13,6 +13,8 @@ import {
 
 import { EmployerEntity } from '../../employer/entities/employer.entity';
 import { JobApplicationEntity } from '../../job-application/entities/job-application.entity';
+import { PositionEntity } from '../../position/entities/position.entity';
+import { RatingEntity } from '../../rating/entities/rating.entity';
 import { AccountSystemStatus } from '../consts/account-system-status.const';
 import { AccountUserStatus } from '../consts/account-user-status.const';
 import { AccountInfoEntity } from './account-info.entity';
@@ -50,6 +52,7 @@ export class AccountEntity extends CustomBaseEntity {
   password?: string;
 
   @ApiProperty()
+  @Expose()
   @Column('enum', {
     enum: AccountSystemStatus,
     default: AccountSystemStatus.UNVERIFIED,
@@ -57,6 +60,7 @@ export class AccountEntity extends CustomBaseEntity {
   systemStatus: AccountSystemStatus;
 
   @ApiProperty()
+  @Expose()
   @Column('enum', {
     enum: AccountUserStatus,
     default: AccountUserStatus.ACTIVE,
@@ -64,25 +68,29 @@ export class AccountEntity extends CustomBaseEntity {
   userStatus: AccountUserStatus;
 
   @ApiProperty()
+  @Expose()
   @RelationId((acc: AccountEntity) => acc.info)
   infoId: string;
-
-  @ApiProperty({ nullable: true })
+  //
+  @ApiProperty({ type: () => AccountInfoEntity, nullable: true })
+  @Expose()
   @OneToOne(() => AccountInfoEntity, (info) => info.account, {
     cascade: ['insert', 'remove', 'soft-remove', 'recover'],
   })
+  @Type(() => AccountInfoEntity)
   info?: AccountInfoEntity;
 
-  @Column({
-    type: 'uuid',
-    nullable: true,
-  })
+  @ApiProperty({ required: false })
+  @Expose()
   @RelationId((acc: AccountEntity) => acc.employer)
   employerId?: string;
-
+  //
+  @ApiProperty({ type: EmployerEntity, required: false })
+  @Expose()
   @OneToOne(() => EmployerEntity, (employer) => employer.account, {
     nullable: true,
   })
+  @Type(() => EmployerEntity)
   employer?: EmployerEntity;
 
   @OneToMany(
@@ -90,6 +98,13 @@ export class AccountEntity extends CustomBaseEntity {
     (jobApplication) => jobApplication.account,
   )
   jobApplications?: JobApplicationEntity[];
+
+  @OneToMany(() => RatingEntity, (rating) => rating.account)
+  ratings?: RatingEntity[];
+
+  @ApiProperty({ type: () => PositionEntity, isArray: true, nullable: true })
+  @OneToMany(() => PositionEntity, (position) => position.employer)
+  positions?: PositionEntity[];
 
   static isActive(
     account: AccountEntity,
