@@ -3,9 +3,6 @@ import { IsBoolean, IsUUID, ValidateNested } from 'class-validator';
 
 export class PositionBulkUpdatedActivityEventPayload {
   @IsUUID()
-  accountId: string;
-
-  @IsUUID()
   employerId: string;
 
   @IsUUID()

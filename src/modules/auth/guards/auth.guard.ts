@@ -2,7 +2,6 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import type { Observable } from 'rxjs';
 
 import { IS_PUBLIC_KEY } from '../decorators/is-public.decorator';
 
@@ -23,17 +22,22 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
     throw new BadRequestException();
   }
 
-  canActivate(
-    context: ExecutionContext,
-  ): Promise<boolean> | boolean | Observable<boolean> {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean | undefined>(
       IS_PUBLIC_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (isPublic) {
-      return true;
-    }
 
-    return super.canActivate(context);
+    try {
+      const canActivate = (await super.canActivate(context)) as boolean;
+
+      if (isPublic) return true;
+
+      return canActivate;
+    } catch (error) {
+      if (isPublic) return true;
+
+      throw error;
+    }
   }
 }

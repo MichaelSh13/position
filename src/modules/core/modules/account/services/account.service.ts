@@ -134,6 +134,7 @@ export class AccountService {
 
     const updateData: QueryDeepPartialEntity<AccountInfoEntity> = {
       emailVerifiedAt: new Date(),
+      // TODO: Set to null for account-info and employer-info if update system-status right.
       revokeVerificationSince: null,
     };
     const { affected } = await this.infoRepository.update(

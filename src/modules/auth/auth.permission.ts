@@ -21,9 +21,9 @@ export const authPermissions: Permissions<
   AccountEntity
 > = {
   CLIENT({ can, user }) {
-    // if (user.isBlocked) {
-    //   return;
-    // }
+    if (!AccountEntity.isActive(user, { verification: false })) {
+      return;
+    }
 
     can(AuthActions.SEND_VERIFICATION_EMAIL, AccountEntity);
   },

@@ -12,12 +12,12 @@ import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { AccessGuard, Actions, UseAbility } from 'nest-casl';
 import { AccountData } from 'src/modules/auth/decorators/account-data.decorator';
 
+import { AccountEntity } from '../../account/entities/account.entity';
 import { EmployerSystemStatus } from '../consts/employer-system-status.const';
 import { EmployerUserStatus } from '../consts/employer-user-status.const';
 import { CreateEmployerDto } from '../dto/create-employer.dto';
 import { EmployerEntity } from '../entities/employer.entity';
 import { EmployerService } from '../services/employer.service';
-import { AccountEntity } from '../../account/entities/account.entity';
 
 @ApiTags('Employer')
 @ApiSecurity('JWT-auth')

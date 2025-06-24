@@ -49,9 +49,13 @@ export class AccountHandlerService {
     // TODO: Do not keep logic and sending other events in handlers, only in services.
     // TODO?: You can keep there checking: e.g. code above.
     account.roles = [...new Set([...account.roles, AccountRoles.EMPLOYER])];
-    await this.accountRepository.update(account.id, {
+    const { affected } = await this.accountRepository.update(account.id, {
       roles: account.roles,
     });
+    if (!affected) {
+      // TODO: error;
+      throw new Error('Account role not updated.');
+    }
 
     const payloadData: AccountChangedRoleEvent = {
       accountId: account.id,

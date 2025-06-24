@@ -9,7 +9,7 @@ export const employerPermissions: Permissions<
   AccountRoles,
   EmployerEntity,
   Actions,
-  AccountEntity
+  AccountEntityWithEmployer
 > = {
   CLIENT({ can, user }) {
     if (!AccountEntity.isActive(user)) {
@@ -19,11 +19,10 @@ export const employerPermissions: Permissions<
     can(Actions.create, EmployerEntity);
   },
   EMPLOYER({ can, user }) {
-    // if (user.employer?.isBlocked) {
-    //   return;
-    // }
+    if (EmployerEntity.isActive(user.employer, { activated: false })) {
+      return;
+    }
 
-    // TODO!: Deal with permissions.
     can(Actions.update, EmployerEntity);
   },
   ADMIN({ can }) {

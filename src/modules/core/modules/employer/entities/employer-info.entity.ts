@@ -7,7 +7,7 @@ import { EmployerEntity } from './employer.entity';
 
 @Entity({ name: 'employer-info' })
 export class EmployerInfoEntity extends CustomBaseEntity {
-  // TODO: Create just to have some checking imitations. Use real data, e.g. passport data...
+  // TODO: Create just to have some checking identify. Use real data, e.g. passport data...
   @ApiProperty()
   @Column('varchar', {
     nullable: true,
@@ -30,7 +30,7 @@ export class EmployerInfoEntity extends CustomBaseEntity {
   @Column('uuid', { unique: true })
   employerId: string;
 
-  @ApiProperty({ type: EmployerEntity, nullable: true })
+  @ApiProperty({ type: () => EmployerEntity, nullable: true })
   @OneToOne(() => EmployerEntity, (acc) => acc.info)
   @JoinColumn({ name: 'employerId' })
   employer?: EmployerEntity;

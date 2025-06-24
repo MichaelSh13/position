@@ -10,13 +10,18 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { InjectRepository } from '@nestjs/typeorm';
 import { AccessGuard, Actions, UseAbility } from 'nest-casl';
 import { AccountData } from 'src/modules/auth/decorators/account-data.decorator';
+import { IsPublic } from 'src/modules/auth/decorators/is-public.decorator';
+import { Repository } from 'typeorm';
 
+import { AccountEntity } from '../../account/entities/account.entity';
 import { PositionSystemStatus } from '../consts/position-system-status.const';
 import { PositionUserStatus } from '../consts/position-user-status.const';
 import { CreatePositionDto } from '../dto/create-position.dto';
+import { PositionInfoDto } from '../dto/position-info.dto';
 import { UpdatePositionDto } from '../dto/update-position.dto';
 import { PositionEntity } from '../entities/position.entity';
 import { PositionService } from '../services/position.service';
@@ -25,7 +30,12 @@ import { PositionService } from '../services/position.service';
 @ApiSecurity('JWT-auth')
 @Controller('position')
 export class PositionController {
-  constructor(private readonly positionService: PositionService) {}
+  constructor(
+    private readonly positionService: PositionService,
+
+    @InjectRepository(PositionEntity)
+    private readonly positionRepository: Repository<PositionEntity>,
+  ) {}
 
   @Post()
   @UseGuards(AccessGuard)
@@ -55,7 +65,7 @@ export class PositionController {
   @Patch(':positionId/system-status/:systemStatus')
   @HttpCode(204)
   @UseGuards(AccessGuard)
-  @UseAbility(Actions.update, PositionEntity)
+  @UseAbility(Actions.manage, PositionEntity)
   changePositionSystemStatus(
     @Param('positionId', new ParseUUIDPipe()) positionId: string,
     @Param('systemStatus', new ParseEnumPipe(PositionSystemStatus))
@@ -70,7 +80,7 @@ export class PositionController {
   @Patch(':positionId/user-status/:userStatus')
   @HttpCode(204)
   @UseGuards(AccessGuard)
-  @UseAbility(Actions.manage, PositionEntity)
+  @UseAbility(Actions.update, PositionEntity)
   changePositionUserStatus(
     @Param('positionId', new ParseUUIDPipe()) positionId: string,
     @Param('userStatus', new ParseEnumPipe(PositionUserStatus))
@@ -85,20 +95,25 @@ export class PositionController {
   }
 
   @Get(':positionId')
-  @UseGuards(AccessGuard)
-  @UseAbility(Actions.read, PositionEntity)
+  @IsPublic()
   getPosition(
     @Param('positionId', new ParseUUIDPipe()) positionId: string,
+    @AccountData() account?: AccountEntity,
   ): Promise<PositionEntity> {
-    return this.positionService.getPosition(positionId);
+    return this.positionService.getPositionInfo(positionId, account?.id);
   }
 
   @Get('')
-  @UseGuards(AccessGuard)
-  @UseAbility(Actions.read, PositionEntity)
-  getPositions(): Promise<PositionEntity[]> {
+  @IsPublic()
+  @ApiResponse({
+    type: PositionInfoDto,
+    isArray: true,
+  })
+  getPositions(
+    @AccountData() account?: AccountEntity,
+  ): Promise<PositionInfoDto[]> {
     // TODO: Pagination with sorting and filtering.
     // TODO: Implement algorithm for rate showing.
-    return this.positionService.getPositions();
+    return this.positionService.getActivePositions(account?.id);
   }
 }

@@ -18,14 +18,12 @@ import { EmployerBulkUpdatedSystemStatusEvent } from '../events/employer-bulk-up
 import { EmployerUpdatedActivityEvent } from '../events/employer-updated-activity.event';
 import { EmployerUpdatedSystemStatusEvent } from '../events/employer-updated-system-status.event';
 import { EmployerUpdatedUserStatusEvent } from '../events/employer-updated-user-status.event';
-import { EmployerService } from '../services/employer.service';
 
 @Injectable()
 export class EmployerHandlerService {
   constructor(
     @InjectRepository(EmployerEntity)
     private readonly employerRepository: Repository<EmployerEntity>,
-    private readonly employerService: EmployerService,
 
     private readonly eventEmitterService: EventEmitterService,
   ) {}

@@ -8,12 +8,13 @@ import { PositionEvents } from '../consts/position.event.const';
 import { PositionSystemStatus } from '../consts/position-system-status.const';
 import { PositionUserStatus } from '../consts/position-user-status.const';
 import { CreatePositionDto } from '../dto/create-position.dto';
+import { PositionInfoDto } from '../dto/position-info.dto';
 import { UpdatePositionDto } from '../dto/update-position.dto';
 import { PositionEntity } from '../entities/position.entity';
-import { PositionChangedSystemStatusEvent } from '../events/position-changed-system-status.event';
 import { PositionChangedUserStatusEvent } from '../events/position-changed-user-status.event';
 import { PositionCreatedEvent } from '../events/position-created.event';
 import { PositionUpdatedEvent } from '../events/position-updated.event';
+import { PositionUpdatedSystemStatusEvent } from '../events/position-updated-system-status.event';
 
 @Injectable()
 export class PositionService {
@@ -29,12 +30,12 @@ export class PositionService {
     { description, title, conditions, location, salary }: CreatePositionDto,
   ): Promise<PositionEntity> {
     try {
-      console.log('');
       const positionData: Partial<PositionEntity> = {
         title,
         description,
         location,
         conditions,
+        // TODO: Use service or find a better way to handle salary.
         salaryCents: salary ? salary * 100 : undefined,
         employerId,
       };
@@ -105,11 +106,54 @@ export class PositionService {
       id,
     });
     if (!position) {
-      // TODO: handle error.
       throw new BadRequestException('Position not found');
     }
 
     return position;
+  }
+
+  async getPositionInfo(
+    positionId: string,
+    accountId?: string,
+  ): Promise<PositionInfoDto> {
+    const positionQB = this.positionRepository
+      .createQueryBuilder('position')
+      .leftJoinAndSelect('position.jobApplications', 'jobApplication')
+      .where('position.id = :positionId', { positionId })
+      .loadRelationCountAndMap(
+        'position.jobApplicationCount',
+        'position.jobApplications',
+      );
+
+    if (accountId) {
+      positionQB
+        .addSelect(
+          (qb) =>
+            qb
+              .select('jobApplication.accountId', 'appliedAccountId')
+              .from('job-application', 'jobApplication')
+              .where('jobApplication.positionId = position.id')
+              .andWhere('jobApplication.accountId = :accountId')
+              .limit(1),
+          'appliedAccountId',
+        )
+        .groupBy('position.id')
+        .setParameter('accountId', accountId);
+    }
+
+    const { entities, raw } = await positionQB.getRawAndEntities();
+
+    const position = entities[0];
+    if (!position) {
+      throw new BadRequestException('Position not found');
+    }
+
+    const positionInfo = plainToInstance(PositionInfoDto, {
+      ...position,
+      appliedAccountId: raw[0]?.appliedAccountId ?? null,
+    });
+
+    return positionInfo;
   }
 
   async getActivePosition(id: string): Promise<PositionEntity> {
@@ -122,20 +166,65 @@ export class PositionService {
     return position;
   }
 
-  getPositions(): Promise<PositionEntity[]> {
-    return this.positionRepository.find();
+  // TODO: Write tests.
+  async getActivePositions(accountId?: string): Promise<PositionInfoDto[]> {
+    // TODO: Exclude all Position field and expose for specific groups, specific fields.
+    const positionsQB = this.positionRepository
+      .createQueryBuilder('position')
+      .leftJoin('position.jobApplications', 'jobApplication')
+      // TODO: Use something better then manually write all options for active positions.
+      .where('position.isParentActive = :isParentActive', {
+        isParentActive: true,
+      })
+      .andWhere('position.systemStatus = :systemStatus', {
+        systemStatus: PositionSystemStatus.APPROVED,
+      })
+      .andWhere('position.userStatus = :userStatus', {
+        userStatus: PositionUserStatus.ACTIVE,
+      })
+      .loadRelationCountAndMap(
+        'position.jobApplicationCount',
+        'position.jobApplications',
+      );
+
+    if (accountId) {
+      positionsQB
+        .addSelect(
+          (qb) =>
+            qb
+              .select('jobApplication.accountId', 'appliedAccountId')
+              .from('job-application', 'jobApplication')
+              .where('jobApplication.positionId = position.id')
+              .andWhere('jobApplication.accountId = :accountId')
+              .limit(1),
+          'appliedAccountId',
+        )
+        .groupBy('position.id')
+        .setParameter('accountId', accountId);
+    }
+
+    const { entities, raw } = await positionsQB.getRawAndEntities();
+    const positions = entities.map((position, i) =>
+      plainToInstance(PositionInfoDto, {
+        ...position,
+        appliedAccountId: raw[i].appliedAccountId,
+      }),
+    );
+
+    const activePositions = positions.filter((position) =>
+      PositionEntity.isActive(position),
+    );
+
+    return activePositions;
   }
 
   async changePositionSystemStatus(
     positionId: string,
     systemStatus: PositionSystemStatus,
   ): Promise<void> {
-    const position = await this.positionRepository.findOneBy({
-      id: positionId,
-    });
-    if (!position) {
-      // TODO: handle error.
-      throw new BadRequestException('Position not found');
+    const position = await this.getPosition(positionId);
+    if (position.systemStatus === systemStatus) {
+      throw new BadRequestException(`Position is already ${systemStatus}.`);
     }
 
     const { affected } = await this.positionRepository.update(position.id, {
@@ -146,12 +235,25 @@ export class PositionService {
       throw new BadRequestException('Error during updating position.');
     }
 
-    const changedStatusPayloadData: PositionChangedSystemStatusEvent = {
+    const updatedPosition = plainToInstance(PositionEntity, {
+      ...position,
+      systemStatus,
+    });
+
+    const wasPositionActive = PositionEntity.isActive(position);
+    const isPositionActive = PositionEntity.isActive(updatedPosition);
+
+    const changedStatusPayloadData: PositionUpdatedSystemStatusEvent = {
       positionId: position.id,
-      payload: { systemStatus },
+      payload: {
+        systemStatus,
+        isPositionActive,
+        employerId: position.employerId,
+        wasPositionActivityChanged: wasPositionActive === isPositionActive,
+      },
     };
     const changedStatusPayload = plainToInstance(
-      PositionChangedSystemStatusEvent,
+      PositionUpdatedSystemStatusEvent,
       changedStatusPayloadData,
     );
     this.eventEmitterService.emit(

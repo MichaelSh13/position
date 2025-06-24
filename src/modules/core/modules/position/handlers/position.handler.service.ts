@@ -17,6 +17,9 @@ import {
   PositionBulkUpdatedActivityEvent,
   PositionBulkUpdatedActivityEventPayload,
 } from '../events/position-bulk-updated-activity.event';
+import { PositionUpdatedActivityEvent } from '../events/position-updated-activity.event';
+import { PositionUpdatedSystemStatusEvent } from '../events/position-updated-system-status.event';
+import { PositionUpdatedUserStatusEvent } from '../events/position-updated-user-status.event';
 
 @Injectable()
 export class PositionHandlerService {
@@ -42,10 +45,9 @@ export class PositionHandlerService {
       // TODO: error
     }
 
-    const result = positions.map((position) => ({
-      ...position,
-      isParentActive,
-    }));
+    const result = positions.map((position) =>
+      plainToInstance(PositionEntity, { ...position, isParentActive }),
+    );
 
     return result;
   }
@@ -55,44 +57,30 @@ export class PositionHandlerService {
   ) {
     if (!data.length) return;
 
-    const employerIds: string[] = [];
-    const eventEmployersMap: Record<
-      string,
-      EmployerBulkUpdatedActivityEventPayload
-    > = {};
-    for (const payload of data) {
-      employerIds.push(payload.employerId);
-      eventEmployersMap[payload.employerId] = payload;
-    }
+    const employerIds = data.map(({ employerId }) => employerId);
+    const eventEmployersMap = Object.fromEntries(
+      data.map((payload) => [payload.employerId, payload]),
+    );
 
     const positions = await this.positionRepository.findBy({
       employerId: In(employerIds),
     });
-    if (employerIds.length !== positions.length) {
-      // TODO: Log data
-
-      if (!positions.length) {
-        // TODO: Error
-        return;
-      }
+    if (!positions.length) {
+      // TODO: Error
+      return;
     }
 
-    const toActivatePositions: PositionEntity[] = [];
-    const toDeactivatePositions: PositionEntity[] = [];
-    for (const position of positions) {
-      if (
-        position.isParentActive ===
-        eventEmployersMap[position.id].isEmployerActive
-      )
-        continue;
+    const availablePositions = positions.filter(
+      ({ isParentActive, id }) =>
+        isParentActive !== eventEmployersMap[id].isEmployerActive,
+    );
 
-      if (position.isParentActive) {
-        toDeactivatePositions.push(position);
-        continue;
-      }
-
-      toActivatePositions.push(position);
-    }
+    const toActivatePositions: PositionEntity[] = availablePositions.filter(
+      ({ isParentActive }) => !isParentActive,
+    );
+    const toDeactivatePositions: PositionEntity[] = availablePositions.filter(
+      ({ isParentActive }) => isParentActive,
+    );
 
     const [activatedPositions, deactivatedPositions] = await Promise.all([
       this.updatePositions(toActivatePositions, true),
@@ -103,7 +91,6 @@ export class PositionHandlerService {
     const payloadData: PositionBulkUpdatedActivityEvent = {
       payloads: updatedPositions.map<PositionBulkUpdatedActivityEventPayload>(
         (position) => ({
-          accountId: eventEmployersMap[position.id].accountId,
           employerId: position.employerId,
           positionId: position.id,
           isPositionActive: PositionEntity.isActive(position),
@@ -139,5 +126,35 @@ export class PositionHandlerService {
     };
 
     await this.bulkPositionUpdate([payload]);
+  }
+
+  @HandleEvent(PositionEvents.UPDATED_SYSTEM_STATUS)
+  async onPositionUpdatedSystemStatus({
+    positionId,
+    payload: { employerId, isPositionActive, wasPositionActivityChanged },
+  }: PositionUpdatedSystemStatusEvent) {
+    if (!wasPositionActivityChanged) return;
+
+    const eventData: PositionUpdatedActivityEvent = {
+      positionId,
+      payload: { employerId, isPositionActive },
+    };
+    const eventInst = plainToInstance(PositionUpdatedActivityEvent, eventData);
+    this.eventEmitterService.emit(PositionEvents.UPDATED_ACTIVITY, eventInst);
+  }
+
+  @HandleEvent(PositionEvents.UPDATED_USER_STATUS)
+  onPositionUpdatedUserStatus({
+    positionId,
+    payload: { employerId, isPositionActive, wasPositionActivityChanged },
+  }: PositionUpdatedUserStatusEvent) {
+    if (!wasPositionActivityChanged) return;
+
+    const eventData: PositionUpdatedActivityEvent = {
+      positionId,
+      payload: { employerId, isPositionActive },
+    };
+    const eventInst = plainToInstance(PositionUpdatedActivityEvent, eventData);
+    this.eventEmitterService.emit(PositionEvents.UPDATED_ACTIVITY, eventInst);
   }
 }

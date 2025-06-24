@@ -1,7 +1,7 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { plainToInstance } from 'class-transformer';
@@ -22,10 +22,8 @@ export class LocalAuthStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(username: string, password: string): Promise<AccountEntity> {
-    // TODO: Validate DTO here if validatLocal will be called earlier then DTO checking.
-    console.log('start');
+    // TODO: Validate DTO here if validateLocal will be called earlier then DTO checking.
     const loginData = plainToInstance(LoginDto, { username, password });
-    console.log('valid');
     const errors = await validate(loginData);
     errors.forEach((err) => {
       const keys = Object.keys(err.constraints ?? {});
@@ -35,13 +33,13 @@ export class LocalAuthStrategy extends PassportStrategy(Strategy) {
       throw new BadRequestException(message);
     });
 
-    console.log('valid pass');
-
     try {
-      return this.authService.validateLocal(username, password);
+      const account = await this.authService.validateLocal(username, password);
+
+      return account;
     } catch {
       // TODO: Log error with a help of logger and throw just text as custom exceptions.
-      throw new UnauthorizedException();
+      throw new ForbiddenException('Wrong username or password');
     }
   }
 }

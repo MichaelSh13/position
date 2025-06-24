@@ -20,6 +20,18 @@ export class AccountInfoEntity extends CustomBaseEntity {
   })
   lastName?: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  @Expose()
+  get fullName() {
+    if (!this.firstName || !this.lastName) return;
+
+    if (this.firstName && this.lastName) {
+      return `${this.firstName} ${this.lastName}`;
+    }
+
+    return this.firstName ?? this.lastName;
+  }
+
   @Expose()
   @Column('varchar', {
     nullable: true,
@@ -49,7 +61,7 @@ export class AccountInfoEntity extends CustomBaseEntity {
   @ApiProperty()
   @Column('uuid', { unique: true })
   accountId: string;
-
+  //
   @ApiProperty({ type: () => AccountEntity, nullable: true })
   @OneToOne(() => AccountEntity, (acc) => acc.info)
   @JoinColumn({ name: 'accountId' })

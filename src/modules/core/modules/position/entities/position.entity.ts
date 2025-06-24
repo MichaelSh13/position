@@ -1,7 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 import { CustomBaseEntity } from 'src/shared/models/custom-base.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
+import { AccountEntity } from '../../account/entities/account.entity';
 import { EmployerEntity } from '../../employer/entities/employer.entity';
 import { JobApplicationEntity } from '../../job-application/entities/job-application.entity';
 import { PositionSystemStatus } from '../consts/position-system-status.const';
@@ -9,7 +11,7 @@ import { PositionUserStatus } from '../consts/position-user-status.const';
 
 @Entity({ name: 'position' })
 export class PositionEntity extends CustomBaseEntity {
-  @ApiProperty()
+  @ApiProperty({ type: String })
   @Column('varchar')
   title: string;
 
@@ -17,33 +19,39 @@ export class PositionEntity extends CustomBaseEntity {
   @Column('varchar')
   description: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: Number, nullable: true })
   @Column('numeric', {
     nullable: true,
   })
   salaryCents?: number;
 
-  @ApiProperty()
+  @ApiProperty({ type: Date, nullable: true })
+  @Column('timestamp with time zone', {
+    nullable: true,
+  })
+  publishDate?: Date;
+
+  @ApiProperty({ type: String, nullable: true })
   @Column('varchar', {
     nullable: true,
   })
   location?: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: [String], nullable: true })
   @Column('varchar', {
     array: true,
     nullable: true,
   })
   conditions?: string[];
 
-  @ApiProperty()
+  @ApiProperty({ enum: PositionSystemStatus })
   @Column('enum', {
     enum: PositionSystemStatus,
-    default: PositionSystemStatus.PENDING,
+    default: PositionSystemStatus.APPROVED,
   })
   systemStatus: PositionSystemStatus;
 
-  @ApiProperty()
+  @ApiProperty({ enum: PositionUserStatus })
   @Column('enum', {
     enum: PositionUserStatus,
     default: PositionUserStatus.INACTIVE,
@@ -56,17 +64,11 @@ export class PositionEntity extends CustomBaseEntity {
   })
   isParentActive: boolean;
 
-  @ApiProperty({ type: String, nullable: true })
-  @Column('varchar', {
-    nullable: true,
-  })
-  // TODO: If we have reason only when parent is not active, so lets just remove isSystemActive and check if reason exist.
-  reason?: string;
-
   @ApiProperty()
   @Column('uuid')
   employerId!: string;
   //
+  @ApiProperty({ type: () => EmployerEntity, nullable: true })
   @ManyToOne(() => EmployerEntity, (employer) => employer.positions)
   @JoinColumn({ name: 'employerId' })
   employer?: EmployerEntity;
@@ -76,6 +78,21 @@ export class PositionEntity extends CustomBaseEntity {
     (jobApplication) => jobApplication.position,
   )
   jobApplications?: JobApplicationEntity[];
+
+  @ApiProperty()
+  @Column('uuid')
+  accountId!: string;
+  //
+  @ApiProperty({ type: () => AccountEntity, nullable: true })
+  @ManyToOne(() => AccountEntity, (account) => account.positions)
+  @JoinColumn({ name: 'accountId' })
+  account?: AccountEntity;
+
+  @Expose()
+  get fullName() {
+    return 'some fullname';
+  }
+  set fullName(_) {}
 
   static isActive(
     position: PositionEntity,
@@ -102,11 +119,6 @@ export class PositionEntity extends CustomBaseEntity {
 
       throw new Error(`Position is '${position.systemStatus}'.`);
     }
-    if (options.parent && !position.isParentActive) {
-      if (!options.error) return false;
-
-      throw new Error(`Position is not active. Parent: '${position.reason}''.`);
-    }
     if (
       options.activated &&
       position.userStatus !== PositionUserStatus.ACTIVE
@@ -114,6 +126,11 @@ export class PositionEntity extends CustomBaseEntity {
       if (!options.error) return false;
 
       throw new Error(`Position is '${position.userStatus}'.`);
+    }
+    if (options.parent && !position.isParentActive) {
+      if (!options.error) return false;
+
+      throw new Error(`Parent is not active.`);
     }
 
     return true;
